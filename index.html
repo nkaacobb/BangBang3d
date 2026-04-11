@@ -257,6 +257,15 @@
       display: block;
     }
 
+    .doc-placeholder {
+      color: #b0b0b0;
+      padding: 2rem;
+      border: 1px dashed rgba(255, 107, 53, 0.3);
+      border-radius: 5px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
     .doc-content iframe {
       width: 100%;
       height: 600px;
@@ -592,21 +601,25 @@ python -m http.server 8000
     
     <div class="doc-section">
       <div class="doc-tabs">
-        <button class="doc-tab active" onclick="switchTab('readme')">README</button>
-        <button class="doc-tab" onclick="switchTab('implementation')">Implementation Guide</button>
-        <button class="doc-tab" onclick="switchTab('specification')">Specification</button>
+        <button class="doc-tab" onclick="switchTab('readme', this)">README</button>
+        <button class="doc-tab" onclick="switchTab('implementation', this)">Implementation Guide</button>
+        <button class="doc-tab" onclick="switchTab('specification', this)">Specification</button>
       </div>
 
-      <div id="readme" class="doc-content active">
-        <iframe src="README.md" framebordeith dual-backend architecture
+      <div id="doc-placeholder" class="doc-placeholder">
+        Select a document tab to load it.
+      </div>
+
+      <div id="readme" class="doc-content">
+        <iframe data-src="README.md" frameborder="0" loading="lazy"></iframe>
       </div>
 
       <div id="implementation" class="doc-content">
-        <iframe src="IMPLEMENTATION.md" frameborder="0"></iframe>
+        <iframe data-src="IMPLEMENTATION.md" frameborder="0" loading="lazy"></iframe>
       </div>
 
       <div id="specification" class="doc-content">
-        <iframe src="BangBang3d Specification.md" frameborder="0"></iframe>
+        <iframe data-src="BangBang3d Specification.md" frameborder="0" loading="lazy"></iframe>
       </div>
     </div>
 
@@ -636,11 +649,16 @@ python -m http.server 8000
 
   <script>
     // Tab switching
-    function switchTab(tabName) {
+    function switchTab(tabName, clickedButton) {
       // Hide all content
       document.querySelectorAll('.doc-content').forEach(content => {
         content.classList.remove('active');
       });
+
+      const placeholder = document.getElementById('doc-placeholder');
+      if (placeholder) {
+        placeholder.style.display = 'none';
+      }
       
       // Deactivate all tabs
       document.querySelectorAll('.doc-tab').forEach(tab => {
@@ -648,10 +666,18 @@ python -m http.server 8000
       });
       
       // Show selected content
-      document.getElementById(tabName).classList.add('active');
+      const selectedContent = document.getElementById(tabName);
+      selectedContent.classList.add('active');
+
+      const iframe = selectedContent.querySelector('iframe[data-src]');
+      if (iframe && !iframe.getAttribute('src')) {
+        iframe.setAttribute('src', iframe.getAttribute('data-src'));
+      }
       
       // Activate selected tab
-      event.target.classList.add('active');
+      if (clickedButton) {
+        clickedButton.classList.add('active');
+      }
     }
 
     // Smooth scrolling for navigation links
