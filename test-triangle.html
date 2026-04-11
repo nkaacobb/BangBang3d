@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebGPU Hardcoded Triangle Test</title>
+  <style>
+    body { margin: 0; padding: 20px; background: #222; }
+    canvas { border: 4px solid #0f0; display: block; }
+    #info { color: white; margin: 10px 0; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div id="info">Testing WebGPU triangle rendering...</div>
+  <canvas id="canvas" width="800" height="600"></canvas>
+  
+  <script type="module">
+    const canvas = document.getElementById('canvas');
+    const info = document.getElementById('info');
+    
+    async function test() {
+      if (!navigator.gpu) {
+        info.textContent = 'WebGPU not supported!';
+        return;
+      }
+      
+      const adapter = await navigator.gpu.requestAdapter();
+      const device = await adapter.requestDevice();
+      const context = canvas.getContext('webgpu');
+      const format = navigator.gpu.getPreferredCanvasFormat();
+      
+      context.configure({
+        device: device,
+        format: format,
+        alphaMode: 'opaque'
+      });
+      
+      info.textContent = `WebGPU initialized! Format: ${format}`;
+      
+      // Hardcoded triangle shader - NO uniforms, NO transformations
+      const shaderCode = `
+        @vertex
+        fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f32> {
+          // Hardcoded triangle positions in NDC space
+          var positions = array<vec2<f32>, 3>(
+            vec2<f32>( 0.0,  0.5),  // Top
+            vec2<f32>(-0.5, -0.5),  // Bottom left
+            vec2<f32>( 0.5, -0.5)   // Bottom right
+          );
+          
+          return vec4<f32>(positions[vertexIndex], 0.0, 1.0);
+        }
+        
+        @fragment
+        fn fragmentMain() -> @location(0) vec4<f32> {
+          return vec4<f32>(0.0, 1.0, 0.0, 1.0);  // Bright green
+        }
+      `;
+      
+      const shaderModule = device.createShaderModule({ code: shaderCode });
+      
+      const pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module: shaderModule,
+          entryPoint: 'vertexMain'
+        },
+        fragment: {
+          module: shaderModule,
+          entryPoint: 'fragmentMain',
+          targets: [{ format: format }]
+        },
+        primitive: {
+          topology: 'triangle-list'
+        }
+      });
+      
+      // Render
+      const commandEncoder = device.createCommandEncoder();
+      const textureView = context.getCurrentTexture().createView();
+      
+      const passEncoder = commandEncoder.beginRenderPass({
+        colorAttachments: [{
+          view: textureView,
+          clearValue: { r: 0.2, g: 0.2, b: 0.3, a: 1.0 },
+          loadOp: 'clear',
+          storeOp: 'store'
+        }]
+      });
+      
+      passEncoder.setPipeline(pipeline);
+      passEncoder.draw(3);  // 3 vertices, no index buffer
+      passEncoder.end();
+      
+      device.queue.submit([commandEncoder.finish()]);
+      
+      info.textContent += ' - Rendered green triangle!';
+    }
+    
+    test();
+  </script>
+</body>
+</html>

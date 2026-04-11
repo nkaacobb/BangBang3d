@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gaussian Splats - BangBang3D</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117; color: #c9d1d9; overflow: hidden;
+    }
+    canvas { display: block; }
+    #ui {
+      position: absolute; top: 10px; left: 10px; width: 270px;
+      background: rgba(0,0,0,0.88); border: 1px solid rgba(88,166,255,0.3);
+      border-radius: 8px; padding: 14px; font-size: 13px;
+      backdrop-filter: blur(8px); max-height: calc(100vh - 20px); overflow-y: auto;
+    }
+    h2 { font-size: 15px; color: #58a6ff; margin-bottom: 10px; }
+    h3 { font-size: 12px; color: #7ee787; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .row { margin: 5px 0; display: flex; align-items: center; gap: 6px; }
+    .row label { flex: 0 0 110px; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row span { width: 40px; text-align: right; font-size: 11px; color: #8b949e; }
+    select {
+      background: #1a1a2e; color: #c9d1d9; border: 1px solid #30363d;
+      border-radius: 3px; padding: 3px 6px; font-size: 12px;
+    }
+    button {
+      background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.3);
+      color: #c9d1d9; padding: 6px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 12px; width: 100%; margin-top: 4px;
+    }
+    button:hover { background: rgba(88,166,255,0.25); }
+    .mode-toggle {
+      display: flex; gap: 4px; margin: 8px 0;
+    }
+    .mode-toggle button {
+      flex: 1; margin: 0;
+    }
+    .mode-toggle button.active {
+      background: rgba(88,166,255,0.35); border-color: #58a6ff;
+    }
+    #stats {
+      margin-top: 10px; font-size: 11px; color: #8b949e; line-height: 1.6;
+    }
+    #drop-zone {
+      border: 2px dashed rgba(88,166,255,0.3); border-radius: 6px;
+      padding: 10px; text-align: center; font-size: 11px; color: #8b949e;
+      margin-top: 8px; cursor: pointer;
+    }
+    #drop-zone.hover { border-color: #58a6ff; color: #58a6ff; }
+    .section { border-top: 1px solid rgba(88,166,255,0.15); padding-top: 6px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="ui">
+    <h2>Gaussian Splats</h2>
+
+    <div class="mode-toggle">
+      <button id="btnPointCloud" class="active">Point Cloud</button>
+      <button id="btnSplat">Gaussian Splats</button>
+    </div>
+
+    <button id="btnLoadSample">Load Sample Data</button>
+
+    <div id="drop-zone">
+      Drop .splat or .ply file here<br>or click to browse
+      <input type="file" id="fileInput" accept=".splat,.ply" style="display:none;">
+    </div>
+
+    <div class="section" id="splatControls">
+      <h3>Splat Controls</h3>
+      <div class="row">
+        <label>Cutoff</label>
+        <input type="range" id="cutoff" min="1" max="6" value="3" step="0.1">
+        <span id="cutoffVal">3.0</span>
+      </div>
+      <div class="row">
+        <label>Max Splats</label>
+        <input type="range" id="maxSplats" min="100" max="100000" value="100000" step="100">
+        <span id="maxSplatsVal">100k</span>
+      </div>
+      <div class="row">
+        <label>Blend Mode</label>
+        <select id="blendModeSplat">
+          <option value="premultiplied" selected>Premultiplied</option>
+          <option value="additive">Additive</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Depth Test</label>
+        <input type="checkbox" id="depthTest" checked>
+      </div>
+      <div class="row">
+        <label>Depth Write</label>
+        <input type="checkbox" id="depthWrite">
+      </div>
+    </div>
+
+    <div class="section" id="pcControls" style="display:none;">
+      <h3>Point Cloud Controls</h3>
+      <div class="row">
+        <label>Point Size</label>
+        <input type="range" id="pointSize" min="1" max="20" value="4" step="0.5">
+        <span id="pointSizeVal">4</span>
+      </div>
+      <div class="row">
+        <label>Size Mode</label>
+        <select id="sizeMode">
+          <option value="attenuated" selected>Attenuated</option>
+          <option value="fixed">Fixed</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="stats">
+      Mode: —<br>
+      Count: —<br>
+      Bounds: —<br>
+      FPS: —
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      Scene, PerspectiveCamera, BangBangRenderer, Color, Vector3,
+      AmbientLight, PointCloud, GaussianSplatCloud,
+      PLYLoader, SplatLoader
+    } from '../../src/index.js';
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // ── Setup ───────────────────────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const scene = new Scene();
+    scene.background = new Color(0.06, 0.06, 0.10);
+
+    const camera = new PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 500);
+    camera.position.set(4, 3, 5);
+    camera.lookAt(new Vector3(0, 0, 0));
+
+    const renderer = new BangBangRenderer({ canvas, width: canvas.width, height: canvas.height, backend: 'webgl2' });
+    await renderer.initialize();
+
+    scene.add(new AmbientLight(0xffffff, 0.3));
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    let currentObject = null;   // could be PointCloud or GaussianSplatCloud
+    let mode = 'pointcloud';    // 'pointcloud' | 'splat'
+
+    // Source data for mode switching
+    let sourcePositions = null;
+    let sourceColors = null;
+    let sourceScales = null;
+    let sourceRotations = null;
+    let sourceCount = 0;
+
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    // ── Mode toggle ─────────────────────────────────────────────────────
+
+    const btnPC = document.getElementById('btnPointCloud');
+    const btnSplat = document.getElementById('btnSplat');
+
+    btnPC.addEventListener('click', () => switchMode('pointcloud'));
+    btnSplat.addEventListener('click', () => switchMode('splat'));
+
+    function switchMode(m) {
+      mode = m;
+      btnPC.classList.toggle('active', m === 'pointcloud');
+      btnSplat.classList.toggle('active', m === 'splat');
+      document.getElementById('pcControls').style.display = m === 'pointcloud' ? '' : 'none';
+      document.getElementById('splatControls').style.display = m === 'splat' ? '' : 'none';
+      rebuildFromSource();
+    }
+
+    function rebuildFromSource() {
+      if (!sourcePositions) return;
+
+      if (currentObject) { scene.remove(currentObject); currentObject.dispose(); currentObject = null; }
+
+      if (mode === 'pointcloud') {
+        const pc = new PointCloud({
+          pointSize: parseFloat(document.getElementById('pointSize').value),
+          sizeMode: document.getElementById('sizeMode').value
+        });
+        // Use RGB only (drop alpha if present)
+        let rgb = sourceColors;
+        if (sourceColors && sourceColors.length === sourceCount * 4) {
+          rgb = new Uint8Array(sourceCount * 3);
+          for (let i = 0; i < sourceCount; i++) {
+            rgb[i*3] = sourceColors[i*4];
+            rgb[i*3+1] = sourceColors[i*4+1];
+            rgb[i*3+2] = sourceColors[i*4+2];
+          }
+        }
+        pc.setData(sourcePositions, rgb);
+        fitAndAdd(pc);
+      } else {
+        const sc = new GaussianSplatCloud({
+          cutoff: parseFloat(document.getElementById('cutoff').value),
+          maxSplats: parseInt(document.getElementById('maxSplats').value),
+          blendMode: document.getElementById('blendModeSplat').value,
+          depthTest: document.getElementById('depthTest').checked,
+          depthWrite: document.getElementById('depthWrite').checked
+        });
+        // Ensure RGBA colours
+        let rgba = sourceColors;
+        if (sourceColors && sourceColors.length === sourceCount * 3) {
+          rgba = new Uint8Array(sourceCount * 4);
+          for (let i = 0; i < sourceCount; i++) {
+            rgba[i*4] = sourceColors[i*3];
+            rgba[i*4+1] = sourceColors[i*3+1];
+            rgba[i*4+2] = sourceColors[i*3+2];
+            rgba[i*4+3] = 200;
+          }
+        }
+        const scales = sourceScales || defaultScales(sourceCount);
+        const rots = sourceRotations || defaultRotations(sourceCount);
+        sc.setData(sourcePositions, rgba, scales, rots);
+        fitAndAdd(sc);
+      }
+    }
+
+    function defaultScales(n) {
+      const s = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { s[i*3] = 0.04; s[i*3+1] = 0.04; s[i*3+2] = 0.04; }
+      return s;
+    }
+    function defaultRotations(n) {
+      const r = new Float32Array(n * 4);
+      for (let i = 0; i < n; i++) { r[i*4] = 1; r[i*4+1] = 0; r[i*4+2] = 0; r[i*4+3] = 0; }
+      return r;
+    }
+
+    function fitAndAdd(obj) {
+      obj.computeBounds();
+      const mid = new Vector3().addVectors(obj.boundingBox.min, obj.boundingBox.max).multiplyScalar(0.5);
+      obj.position.set(-mid.x, -mid.y, -mid.z);
+      scene.add(obj);
+      currentObject = obj;
+
+      const size = new Vector3().subVectors(obj.boundingBox.max, obj.boundingBox.min);
+      const maxDim = Math.max(size.x, size.y, size.z) || 5;
+      camera.position.set(maxDim, maxDim * 0.7, maxDim);
+      camera.lookAt(new Vector3(0, 0, 0));
+
+      updateStats();
+      console.log(`[GaussianSplats] Loaded ${mode}:`, obj.count, 'elements');
+    }
+
+    // ── File loading ────────────────────────────────────────────────────
+
+    async function loadSample() {
+      try {
+        if (mode === 'splat') {
+          const sc = await SplatLoader.load('assets/sample-sphere.splat');
+          sourcePositions = sc.positions;
+          sourceColors = sc.colors;
+          sourceScales = sc.scales;
+          sourceRotations = sc.rotations;
+          sourceCount = sc.count;
+          fitAndAdd(sc);
+          currentObject = sc;
+        } else {
+          // Load PLY as point cloud for the sample view
+          const pc = await PLYLoader.load('assets/sample-sphere-pc.ply').catch(() => null);
+          if (pc) {
+            sourcePositions = pc.positions;
+            sourceColors = pc.colors;
+            sourceScales = null;
+            sourceRotations = null;
+            sourceCount = pc.count;
+            fitAndAdd(pc);
+            currentObject = pc;
+          } else {
+            // Generate Fibonacci sphere as point cloud fallback
+            generateFibSpherePC();
+          }
+        }
+      } catch (e) {
+        console.warn('Sample load failed, generating procedurally:', e);
+        generateFibSpherePC();
+      }
+    }
+
+    function generateFibSpherePC() {
+      const n = 500;
+      const pos = new Float32Array(n * 3);
+      const col = new Uint8Array(n * 3);
+      const golden = (1 + Math.sqrt(5)) / 2;
+      for (let i = 0; i < n; i++) {
+        const theta = 2 * Math.PI * i / golden;
+        const phi = Math.acos(1 - 2 * (i + 0.5) / n);
+        const r = 2;
+        pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+        pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+        pos[i*3+2] = r * Math.cos(phi);
+        col[i*3]   = Math.floor(((pos[i*3]/r)+1)*0.5*255);
+        col[i*3+1] = Math.floor(((pos[i*3+1]/r)+1)*0.5*255);
+        col[i*3+2] = Math.floor(((pos[i*3+2]/r)+1)*0.5*255);
+      }
+      sourcePositions = pos;
+      sourceColors = col;
+      sourceScales = null;
+      sourceRotations = null;
+      sourceCount = n;
+      rebuildFromSource();
+    }
+
+    async function loadFile(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'splat') {
+        const buf = await file.arrayBuffer();
+        const sc = SplatLoader.parse(buf);
+        sourcePositions = sc.positions;
+        sourceColors = sc.colors;
+        sourceScales = sc.scales;
+        sourceRotations = sc.rotations;
+        sourceCount = sc.count;
+        if (mode !== 'splat') switchMode('splat');
+        else { fitAndAdd(sc); currentObject = sc; }
+      } else {
+        const buf = await file.arrayBuffer();
+        const pc = PLYLoader.parse(buf);
+        sourcePositions = pc.positions;
+        sourceColors = pc.colors;
+        sourceScales = null;
+        sourceRotations = null;
+        sourceCount = pc.count;
+        if (mode !== 'pointcloud') switchMode('pointcloud');
+        else { fitAndAdd(pc); currentObject = pc; }
+      }
+    }
+
+    // ── UI wiring ───────────────────────────────────────────────────────
+
+    document.getElementById('btnLoadSample').addEventListener('click', loadSample);
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('fileInput');
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('hover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+    dropZone.addEventListener('drop', async e => {
+      e.preventDefault(); dropZone.classList.remove('hover');
+      if (e.dataTransfer.files[0]) await loadFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', async e => {
+      if (e.target.files[0]) await loadFile(e.target.files[0]);
+    });
+
+    // Splat controls
+    document.getElementById('cutoff').addEventListener('input', e => {
+      document.getElementById('cutoffVal').textContent = parseFloat(e.target.value).toFixed(1);
+      if (currentObject?.isGaussianSplatCloud) currentObject.cutoff = parseFloat(e.target.value);
+    });
+    document.getElementById('maxSplats').addEventListener('input', e => {
+      const v = parseInt(e.target.value);
+      document.getElementById('maxSplatsVal').textContent = v >= 1000 ? (v/1000).toFixed(0)+'k' : v;
+      if (currentObject?.isGaussianSplatCloud) currentObject.maxSplats = v;
+    });
+    document.getElementById('blendModeSplat').addEventListener('change', e => {
+      if (currentObject?.isGaussianSplatCloud) currentObject.blendMode = e.target.value;
+    });
+    document.getElementById('depthTest').addEventListener('change', e => {
+      if (currentObject?.isGaussianSplatCloud) currentObject.depthTest = e.target.checked;
+    });
+    document.getElementById('depthWrite').addEventListener('change', e => {
+      if (currentObject?.isGaussianSplatCloud) currentObject.depthWrite = e.target.checked;
+    });
+
+    // Point cloud controls
+    document.getElementById('pointSize').addEventListener('input', e => {
+      document.getElementById('pointSizeVal').textContent = e.target.value;
+      if (currentObject?.isPointCloud) currentObject.pointSize = parseFloat(e.target.value);
+    });
+    document.getElementById('sizeMode').addEventListener('change', e => {
+      if (currentObject?.isPointCloud) currentObject.sizeMode = e.target.value;
+    });
+
+    // ── Stats ───────────────────────────────────────────────────────────
+
+    function updateStats() {
+      if (!currentObject) return;
+      const b = currentObject.boundingBox;
+      const label = currentObject.isGaussianSplatCloud ? 'Splats' : 'Points';
+      document.getElementById('stats').innerHTML =
+        `Mode: ${mode === 'splat' ? 'Gaussian Splats' : 'Point Cloud'}<br>` +
+        `${label}: ${currentObject.count.toLocaleString()}<br>` +
+        `Bounds: (${b.min.x.toFixed(1)}, ${b.min.y.toFixed(1)}, ${b.min.z.toFixed(1)}) → ` +
+        `(${b.max.x.toFixed(1)}, ${b.max.y.toFixed(1)}, ${b.max.z.toFixed(1)})<br>` +
+        `FPS: ${fps}`;
+    }
+
+    // ── Render loop ─────────────────────────────────────────────────────
+
+    function animate() {
+      controls.update();
+      renderer.render(scene, camera);
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime > 1000) {
+        fps = Math.round(frameCount * 1000 / (now - lastTime));
+        frameCount = 0;
+        lastTime = now;
+        updateStats();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Auto-load sample in splat mode
+    switchMode('splat');
+    await loadSample();
+    animate();
+  </script>
+</body>
+</html>

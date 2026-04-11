@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3D – Retro B/W Dither Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      overflow: hidden;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+
+    #controls {
+      position: absolute;
+      top: 16px; right: 16px;
+      width: 280px;
+      background: rgba(13, 17, 23, 0.92);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+    }
+
+    #controls h2 {
+      font-size: 15px;
+      margin-bottom: 12px;
+      color: #58a6ff;
+    }
+
+    .ctrl-group {
+      margin-bottom: 10px;
+    }
+
+    .ctrl-group label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #8b949e;
+    }
+
+    .ctrl-group input[type="range"] {
+      width: 100%;
+    }
+
+    .ctrl-group select {
+      width: 100%;
+      font-size: 12px;
+      background: #1a1a2e;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 3px 6px;
+    }
+
+    .value-display {
+      float: right;
+      font-size: 11px;
+      color: #58a6ff;
+      font-family: monospace;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      background: rgba(88, 166, 255, 0.15);
+      color: #58a6ff;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: rgba(88, 166, 255, 0.3);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .checkbox-row label { margin: 0; }
+
+    #info {
+      position: absolute;
+      bottom: 16px; left: 16px;
+      font-size: 11px;
+      color: #8b949e;
+      z-index: 10;
+    }
+
+    .debug-overlay {
+      position: absolute;
+      bottom: 16px; right: 16px;
+      display: flex;
+      gap: 4px;
+      z-index: 10;
+    }
+    .debug-overlay button {
+      width: auto;
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+    .debug-overlay button.active {
+      background: rgba(88, 166, 255, 0.4);
+      border-color: #58a6ff;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="controls">
+    <h2>🎨 Retro B/W Dither</h2>
+
+    <div class="ctrl-group">
+      <label>Strength <span class="value-display" id="strVal">1.00</span></label>
+      <input type="range" id="strength" min="0" max="1" value="1" step="0.01">
+    </div>
+
+    <div class="ctrl-group">
+      <label>Threshold Bias <span class="value-display" id="biasVal">0.00</span></label>
+      <input type="range" id="bias" min="-0.5" max="0.5" value="0" step="0.01">
+    </div>
+
+    <div class="ctrl-group">
+      <label>Bayer Matrix</label>
+      <select id="matrixSize">
+        <option value="4">4×4 Bayer</option>
+        <option value="8" selected>8×8 Bayer</option>
+      </select>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="invert">
+      <label>Invert (white on black)</label>
+    </div>
+
+    <button id="btnMacPaint">MacPaint Preset</button>
+    <button id="btnToggle">Disable Dither</button>
+  </div>
+
+  <div class="debug-overlay">
+    <button id="btnViewFinal" class="active">Final</button>
+    <button id="btnViewOriginal">Original</button>
+  </div>
+
+  <div id="info">
+    BangBang3D – Ordered Dithering Post-Process Demo | <span id="fps">0</span> FPS
+  </div>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      LambertMaterial,
+      PBRMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      Vector3,
+      Color,
+      GridOverlay,
+      AmbientLight,
+      PointLight,
+      DirectionalLight,
+      PostFXPipeline,
+      DitherPass
+    } from '../../src/index.js';
+
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // ── Setup ────────────────────────────────────────────────────────────
+
+    const canvas = document.getElementById('canvas');
+    let renderer, scene, camera, controls;
+
+    async function init() {
+      renderer = new BangBangRenderer({
+        canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: 'gpu'
+      });
+      await renderer.initialize();
+
+      scene = new Scene();
+      scene.background = new Color(0.18, 0.18, 0.22);
+
+      camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 100);
+      camera.position.set(5, 5, 8);
+
+      controls = new OrbitControls(camera, canvas);
+      controls.target.set(0, 1, 0);
+
+      // Lights
+      const ambient = new AmbientLight(0x404040, 0.6);
+      scene.add(ambient);
+
+      const sun = new DirectionalLight(0xffffff, 1.0);
+      sun.position.set(5, 10, 7);
+      scene.add(sun);
+
+      const point = new PointLight(0xff8844, 1.5);
+      point.position.set(-3, 4, 2);
+      scene.add(point);
+
+      // Ground plane
+      const ground = new Mesh(
+        new PlaneGeometry(20, 20),
+        new LambertMaterial({ color: 0x888888 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+
+      // Sphere
+      const sphere = new Mesh(
+        new SphereGeometry(1.2, 32, 24),
+        new PBRMaterial({ color: 0xcc4444, metalness: 0.3, roughness: 0.4 })
+      );
+      sphere.position.set(0, 1.2, 0);
+      scene.add(sphere);
+
+      // Box
+      const box = new Mesh(
+        new BoxGeometry(1.5, 1.5, 1.5),
+        new PBRMaterial({ color: 0x4488cc, metalness: 0.6, roughness: 0.2 })
+      );
+      box.position.set(3, 0.75, -1);
+      scene.add(box);
+
+      // Another sphere
+      const sphere2 = new Mesh(
+        new SphereGeometry(0.6, 24, 16),
+        new LambertMaterial({ color: 0x66cc66 })
+      );
+      sphere2.position.set(-2, 0.6, 2);
+      scene.add(sphere2);
+
+      // Tall box
+      const pillar = new Mesh(
+        new BoxGeometry(0.5, 3, 0.5),
+        new LambertMaterial({ color: 0xcccc44 })
+      );
+      pillar.position.set(-3, 1.5, -2);
+      scene.add(pillar);
+
+      // Grid
+      const grid = new GridOverlay({ size: 20, divisions: 20, color1: 0x444444, color2: 0x222222 });
+      grid.addToScene(scene);
+
+      // ── Enable dithering on the main camera ───────────────────────────
+      camera.setPostFXProfileSync(PostFXPipeline, 'mac_dither', {
+        strength: 1.0,
+        matrixSize: 8
+      });
+
+      // Start
+      animate();
+      wireUI();
+
+      console.log('✓ Dither Viewer ready');
+    }
+
+    // ── Render Loop ──────────────────────────────────────────────────────
+
+    let lastTime = 0;
+    let frameCount = 0;
+    let fpsTimer = 0;
+
+    function animate(t = 0) {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+
+      // FPS counter
+      frameCount++;
+      fpsTimer += t - lastTime;
+      lastTime = t;
+      if (fpsTimer >= 1000) {
+        document.getElementById('fps').textContent = frameCount;
+        frameCount = 0;
+        fpsTimer = 0;
+      }
+    }
+
+    // ── UI Wiring ────────────────────────────────────────────────────────
+
+    function getDitherPass() {
+      if (!camera.postFXPipeline) return null;
+      return camera.postFXPipeline.getPass('DitherPass');
+    }
+
+    function wireUI() {
+      const strSlider  = document.getElementById('strength');
+      const biasSlider = document.getElementById('bias');
+      const matSelect  = document.getElementById('matrixSize');
+      const invertCb   = document.getElementById('invert');
+
+      strSlider.addEventListener('input', () => {
+        const p = getDitherPass(); if (!p) return;
+        p.strength = parseFloat(strSlider.value);
+        document.getElementById('strVal').textContent = p.strength.toFixed(2);
+      });
+
+      biasSlider.addEventListener('input', () => {
+        const p = getDitherPass(); if (!p) return;
+        p.bias = parseFloat(biasSlider.value);
+        document.getElementById('biasVal').textContent = p.bias.toFixed(2);
+      });
+
+      matSelect.addEventListener('change', () => {
+        const p = getDitherPass(); if (!p) return;
+        p.matrixSize = parseInt(matSelect.value);
+      });
+
+      invertCb.addEventListener('change', () => {
+        const p = getDitherPass(); if (!p) return;
+        p.invert = invertCb.checked;
+      });
+
+      // MacPaint preset
+      document.getElementById('btnMacPaint').addEventListener('click', () => {
+        const p = getDitherPass(); if (!p) return;
+        p.macPaintPreset();
+        strSlider.value = 1; biasSlider.value = 0; matSelect.value = '8'; invertCb.checked = false;
+        document.getElementById('strVal').textContent = '1.00';
+        document.getElementById('biasVal').textContent = '0.00';
+      });
+
+      // Toggle
+      const toggleBtn = document.getElementById('btnToggle');
+      toggleBtn.addEventListener('click', () => {
+        if (camera.postFXEnabled) {
+          camera.postFXEnabled = false;
+          toggleBtn.textContent = 'Enable Dither';
+        } else {
+          camera.postFXEnabled = true;
+          toggleBtn.textContent = 'Disable Dither';
+        }
+      });
+
+      // Debug views
+      document.getElementById('btnViewFinal').addEventListener('click', () => {
+        camera.postFXEnabled = true;
+        toggleBtn.textContent = 'Disable Dither';
+        document.getElementById('btnViewFinal').classList.add('active');
+        document.getElementById('btnViewOriginal').classList.remove('active');
+      });
+
+      document.getElementById('btnViewOriginal').addEventListener('click', () => {
+        camera.postFXEnabled = false;
+        toggleBtn.textContent = 'Enable Dither';
+        document.getElementById('btnViewOriginal').classList.add('active');
+        document.getElementById('btnViewFinal').classList.remove('active');
+      });
+
+      // Resize
+      window.addEventListener('resize', () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3d - Lights Example</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 5px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 300px;
+    }
+    
+    #canvas {
+      display: block;
+      margin: 0;
+    }
+    
+    h1 {
+      margin: 0 0 5px 0;
+      font-size: 18px;
+      color: #ffa500;
+    }
+    
+    p {
+      margin: 3px 0;
+      font-size: 12px;
+      color: #ccc;
+    }
+    
+    .light-info {
+      margin: 5px 0;
+      padding: 5px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    
+    #debugInfo {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      color: #0f0;
+      line-height: 1.6;
+      border: 1px solid rgba(0, 255, 0, 0.3);
+    }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 120px;
+    }
+    
+    #lightPanel {
+      position: absolute;
+      top: 180px;
+      right: 10px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.9);
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid rgba(255, 165, 0, 0.3);
+      min-width: 280px;
+      max-width: 320px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+    
+    #lightPanel h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #ffa500;
+      border-bottom: 1px solid rgba(255, 165, 0, 0.3);
+      padding-bottom: 5px;
+    }
+    
+    .light-item {
+      margin: 8px 0;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      border-left: 3px solid #238636;
+    }
+    
+    .light-item.disabled {
+      opacity: 0.5;
+      border-left-color: #666;
+    }
+    
+    .light-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .light-name {
+      font-weight: 600;
+      color: #c9d1d9;
+    }
+    
+    .light-controls {
+      margin: 5px 0;
+    }
+    
+    .light-controls label {
+      display: block;
+      font-size: 10px;
+      color: #8b949e;
+      margin: 4px 0 2px 0;
+    }
+    
+    .light-controls input[type="range"] {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      outline: none;
+    }
+    
+    .light-controls input[type="number"],
+    .light-controls input[type="color"] {
+      width: 100%;
+      padding: 4px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      color: #fff;
+      font-size: 11px;
+    }
+    
+    .position-group {
+      display: flex;
+      gap: 4px;
+      margin: 4px 0;
+    }
+    
+    .position-group input {
+      flex: 1;
+      width: auto;
+    }
+    
+    .btn-mini {
+      padding: 4px 8px;
+      font-size: 10px;
+      margin: 2px;
+      min-width: 60px;
+    }
+    
+    .btn-danger {
+      background: #da3633;
+    }
+    
+    .btn-danger:hover {
+      background: #f85149;
+    }
+    
+    .add-light-buttons {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    
+    .add-light-buttons button {
+      flex: 1;
+      font-size: 10px;
+      padding: 6px 4px;
+    }
+    
+    button {
+      width: 100%;
+      padding: 6px 10px;
+      margin: 3px 0;
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    
+    button:hover {
+      background: #2ea043;
+    }
+    
+    button.active {
+      background: #1f6feb;
+    }
+    
+    button.active:hover {
+      background: #388bfd;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <h1>BangBang3d: Interactive Lighting</h1>
+    <p>Lambert shading with controllable lights</p>
+    <p id="fps">FPS: --</p>
+    <p style="margin-top: 10px; font-size: 11px; opacity: 0.7;">
+      Use the Light Manager to add/edit lights →
+    </p>
+  </div>
+  
+  <div id="controls">
+    <div style="margin-bottom: 8px; font-weight: 600; color: #c9d1d9;">Backend:</div>
+    <button id="btnCPU">CPU</button>
+    <button id="btnGPU" class="active">GPU</button>
+    <button id="btnAuto">Auto</button>
+  </div>
+  
+  <div id="lightPanel">
+    <h3>🔦 Light Manager</h3>
+    <div id="lightList"></div>
+    <div class="add-light-buttons">
+      <button id="addDirectional" title="Add Directional Light">+ Direct</button>
+      <button id="addAmbient" title="Add Ambient Light">+ Ambient</button>
+    </div>
+  </div>
+  
+  <div id="debugInfo">Camera Debug Info</div>
+  
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      PlaneGeometry,
+      BasicMaterial,
+      LambertMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      AmbientLight,
+      DirectionalLight,
+      Vector3
+    } from '../../src/index.js';
+    
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // Global variables
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let cube = null;
+    let plane = null;
+    let animationId = null;
+    let ambientLight = null;
+    let dirLight1 = null;
+    let dirLight2 = null;
+
+    // Initialize renderer with specified backend
+    async function initRenderer(backendType) {
+      // Dispose old renderer if it exists
+      if (renderer) {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
+        renderer.dispose();
+        renderer = null;
+      }
+
+      console.log(`Initializing ${backendType} backend...`);
+
+      // Important: Replace the canvas element to clear WebGPU context
+      // Once a canvas is configured for WebGPU, it can't be used for 2D context
+      const oldCanvas = document.getElementById('canvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      
+      // Update canvas reference
+      const canvas = document.getElementById('canvas');
+
+      // Create renderer with specified backend
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: backendType
+      });
+
+      // Wait for initialization (GPU is async)
+      await renderer.initialize();
+      
+      if (!renderer.isReady()) {
+        console.error('Renderer failed to initialize');
+        return;
+      }
+      
+      renderer.setClearColor(0x0a0a0a);
+      
+      console.log('Backend initialized:', renderer.backendType);
+      console.log('Capabilities:', renderer.capabilities);
+
+      // Recreate controls with new canvas
+      if (controls) {
+        controls.dispose();
+      }
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Start animation loop
+      if (!animationId) {
+        animate(performance.now());
+      }
+    }
+
+    // Create scene and objects (called once at startup)
+    function createScene() {
+      // Create scene
+      scene = new Scene();
+
+      // Create camera
+      camera = new PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.5,
+        100
+      );
+      camera.position.set(0, 2, 5);
+      camera.lookAt(new Vector3(0, 0, 0));
+      
+      // Controls will be created in initRenderer with the canvas
+
+      // Add ambient light
+      ambientLight = new AmbientLight(0xffffff, 0.3);
+      scene.add(ambientLight);
+
+      // Add directional light 1 (orange, from top-right)
+      dirLight1 = new DirectionalLight(0xffa500, 0.8);
+      dirLight1.position.set(5, 5, 3);
+      dirLight1.target = new Vector3(0, 0, 0);
+      scene.add(dirLight1);
+
+      // Add directional light 2 (blue, from bottom-left)
+      dirLight2 = new DirectionalLight(0x4488ff, 0.5);
+      dirLight2.position.set(-4, -2, 2);
+      dirLight2.target = new Vector3(0, 0, 0);
+      scene.add(dirLight2);
+
+      // Create a cube with Lambert material
+      const cubeGeometry = new BoxGeometry(1.5, 1.5, 1.5);
+      const cubeMaterial = new LambertMaterial({
+        color: 0xeeeeee  // White base color to show lighting clearly
+      });
+      cube = new Mesh(cubeGeometry, cubeMaterial);
+      cube.position.y = 0.75;
+      scene.add(cube);
+
+      // Create a ground plane (using thin box for thickness)
+      const planeGeometry = new BoxGeometry(8, 0.1, 8);
+      const planeMaterial = new LambertMaterial({
+        color: 0x444444
+      });
+      planeMaterial.side = 'DoubleSide'; // Render both sides to prevent disappearing
+      plane = new Mesh(planeGeometry, planeMaterial);
+      plane.position.set(0, -0.4, 0); // Position below cube (raised from -0.8 to reduce near-plane issues)
+      scene.add(plane);
+    }
+
+    // Create scene once at startup
+    createScene();
+
+    // Light management system
+    let lights = [];
+    let lightMarkers = []; // Visual markers for light positions
+    let nextLightId = 0;
+
+    // Add initial lights to tracking
+    lights.push({ id: nextLightId++, name: 'Ambient Light', light: ambientLight, enabled: true });
+    lights.push({ id: nextLightId++, name: 'Directional 1', light: dirLight1, enabled: true });
+    lights.push({ id: nextLightId++, name: 'Directional 2', light: dirLight2, enabled: true });
+
+    function updateLightList() {
+      const listEl = document.getElementById('lightList');
+      listEl.innerHTML = '';
+
+      lights.forEach(lightData => {
+        const light = lightData.light;
+        const itemEl = document.createElement('div');
+        itemEl.className = 'light-item' + (lightData.enabled ? '' : ' disabled');
+        
+        const headerEl = document.createElement('div');
+        headerEl.className = 'light-header';
+        
+        const nameEl = document.createElement('span');
+        nameEl.className = 'light-name';
+        nameEl.textContent = lightData.name + (lightData.enabled ? '' : ' (Off)');
+        
+        const btnGroup = document.createElement('div');
+        btnGroup.style.display = 'flex';
+        btnGroup.style.gap = '4px';
+        
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn-mini';
+        toggleBtn.textContent = lightData.enabled ? 'Disable' : 'Enable';
+        toggleBtn.onclick = () => {
+          lightData.enabled = !lightData.enabled;
+          if (lightData.enabled && !light.parent) {
+            scene.add(light);
+          } else if (!lightData.enabled && light.parent) {
+            scene.remove(light);
+          }
+          updateLightList();
+        };
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-mini btn-danger';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.onclick = () => {
+          scene.remove(light);
+          lights = lights.filter(l => l.id !== lightData.id);
+          updateLightList();
+          updateLightMarkers();
+        };
+        
+        btnGroup.appendChild(toggleBtn);
+        btnGroup.appendChild(deleteBtn);
+        headerEl.appendChild(nameEl);
+        headerEl.appendChild(btnGroup);
+        itemEl.appendChild(headerEl);
+        
+        // Light-specific controls
+        const controlsEl = document.createElement('div');
+        controlsEl.className = 'light-controls';
+        
+        // Color picker
+        const colorLabel = document.createElement('label');
+        colorLabel.textContent = 'Color:';
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = '#' + light.color.getHexString();
+        colorInput.oninput = (e) => {
+          light.color.setHex(parseInt(e.target.value.slice(1), 16));
+        };
+        controlsEl.appendChild(colorLabel);
+        controlsEl.appendChild(colorInput);
+        
+        // Intensity slider
+        const intensityLabel = document.createElement('label');
+        intensityLabel.textContent = `Intensity: ${light.intensity.toFixed(2)}`;
+        const intensityInput = document.createElement('input');
+        intensityInput.type = 'range';
+        intensityInput.min = '0';
+        intensityInput.max = '2';
+        intensityInput.step = '0.1';
+        intensityInput.value = light.intensity;
+        intensityInput.oninput = (e) => {
+          light.intensity = parseFloat(e.target.value);
+          intensityLabel.textContent = `Intensity: ${light.intensity.toFixed(2)}`;
+        };
+        controlsEl.appendChild(intensityLabel);
+        controlsEl.appendChild(intensityInput);
+        
+        // Directional light position controls
+        if (light.isDirectionalLight) {
+          const posLabel = document.createElement('label');
+          posLabel.textContent = 'Position:';
+          controlsEl.appendChild(posLabel);
+          
+          const posGroup = document.createElement('div');
+          posGroup.className = 'position-group';
+          
+          const xInput = document.createElement('input');
+          xInput.type = 'number';
+          xInput.placeholder = 'X';
+          xInput.value = light.position.x.toFixed(1);
+          xInput.step = '0.5';
+          xInput.oninput = (e) => {
+            light.position.x = parseFloat(e.target.value) || 0;
+            light.direction = light.target.clone().sub(light.position).normalize();
+            updateLightMarkers();
+          };
+          
+          const yInput = document.createElement('input');
+          yInput.type = 'number';
+          yInput.placeholder = 'Y';
+          yInput.value = light.position.y.toFixed(1);
+          yInput.step = '0.5';
+          yInput.oninput = (e) => {
+            light.position.y = parseFloat(e.target.value) || 0;
+            light.direction = light.target.clone().sub(light.position).normalize();
+            updateLightMarkers();
+          };
+          
+          const zInput = document.createElement('input');
+          zInput.type = 'number';
+          zInput.placeholder = 'Z';
+          zInput.value = light.position.z.toFixed(1);
+          zInput.step = '0.5';
+          zInput.oninput = (e) => {
+            light.position.z = parseFloat(e.target.value) || 0;
+            light.direction = light.target.clone().sub(light.position).normalize();
+            updateLightMarkers();
+          };
+          
+          posGroup.appendChild(xInput);
+          posGroup.appendChild(yInput);
+          posGroup.appendChild(zInput);
+          controlsEl.appendChild(posGroup);
+        }
+        
+        itemEl.appendChild(controlsEl);
+        listEl.appendChild(itemEl);
+      });
+    }
+
+    function updateLightMarkers() {
+      // Remove old markers
+      lightMarkers.forEach(marker => scene.remove(marker));
+      lightMarkers = [];
+      
+      // Add markers for directional lights
+      lights.forEach(lightData => {
+        if (lightData.light.isDirectionalLight && lightData.enabled) {
+          const markerGeo = new BoxGeometry(0.2, 0.2, 0.2);
+          const markerMat = new BasicMaterial({ color: lightData.light.color.getHex() });
+          const marker = new Mesh(markerGeo, markerMat);
+          marker.position.copy(lightData.light.position);
+          scene.add(marker);
+          lightMarkers.push(marker);
+        }
+      });
+    }
+
+    // Add light buttons
+    document.getElementById('addDirectional').addEventListener('click', () => {
+      const newLight = new DirectionalLight(0xffffff, 0.8);
+      newLight.position.set(
+        Math.random() * 6 - 3,
+        Math.random() * 4 + 2,
+        Math.random() * 6 - 3
+      );
+      newLight.target = new Vector3(0, 0, 0);
+      newLight.direction = newLight.target.clone().sub(newLight.position).normalize();
+      scene.add(newLight);
+      
+      lights.push({
+        id: nextLightId++,
+        name: `Directional ${lights.filter(l => l.light.isDirectionalLight).length + 1}`,
+        light: newLight,
+        enabled: true
+      });
+      
+      updateLightList();
+      updateLightMarkers();
+    });
+
+    document.getElementById('addAmbient').addEventListener('click', () => {
+      const newLight = new AmbientLight(0xffffff, 0.3);
+      scene.add(newLight);
+      
+      lights.push({
+        id: nextLightId++,
+        name: `Ambient ${lights.filter(l => l.light.isAmbientLight).length + 1}`,
+        light: newLight,
+        enabled: true
+      });
+      
+      updateLightList();
+    });
+
+    // Initialize light UI
+    updateLightList();
+    updateLightMarkers();
+
+    // Helper function to get render stats (works for both CPU and GPU backends)
+    function getRenderStats() {
+      if (renderer.backendType === 'cpu' && renderer._backend && renderer._backend.pipeline) {
+        // CPU backend has detailed pipeline stats
+        const stats = renderer._backend.pipeline.stats;
+        return {
+          trianglesRendered: stats.trianglesRendered || 0,
+          trianglesSubmitted: stats.trianglesSubmitted || 0,
+          trianglesClipped: stats.trianglesClippedNear || 0,
+          trianglesCulled: stats.trianglesCulled || 0
+        };
+      } else {
+        // GPU backend has simpler info
+        const info = renderer.info.render;
+        return {
+          trianglesRendered: info.triangles || 0,
+          trianglesSubmitted: info.triangles || 0,
+          trianglesClipped: 0,
+          trianglesCulled: 0
+        };
+      }
+    }
+
+    // Helper function to reset stats (if supported by backend)
+    function resetRenderStats() {
+      if (renderer.backendType === 'cpu' && renderer._backend && renderer._backend.pipeline) {
+        renderer._backend.pipeline.resetStats();
+      }
+      // GPU backend auto-resets per frame, no action needed
+    }
+
+    // Animation loop
+    let lastTime = performance.now();
+    let frames = 0;
+    let fps = 0;
+
+    function animate(currentTime) {
+      animationId = requestAnimationFrame(animate);
+
+      // Update FPS counter
+      frames++;
+      if (currentTime >= lastTime + 1000) {
+        fps = frames;
+        frames = 0;
+        lastTime = currentTime;
+        document.getElementById('fps').textContent = `FPS: ${fps}`;
+      }
+
+      // Update debug info every frame
+      const debugInfo = renderer.getDebugInfo();
+      const stats = getRenderStats();
+      if (debugInfo.camera) {
+        document.getElementById('debugInfo').innerHTML = `
+          Near: ${debugInfo.camera.near} | Far: ${debugInfo.camera.far}<br>
+          FOV: ${debugInfo.camera.fov}° | Distance: ${debugInfo.camera.distance}<br>
+          Position: ${debugInfo.camera.position}<br>
+          Backend: <span style="color: #79c0ff;">${renderer.backendType}</span><br>
+          <span style="opacity: 0.8; color: #0f0;">Tris: ${stats.trianglesRendered}/${stats.trianglesSubmitted} | Clipped: ${stats.trianglesClipped} | Culled: ${stats.trianglesCulled}</span>
+        `;
+      }
+
+      // Reset stats for next frame
+      resetRenderStats();
+
+      // Update controls
+      controls.update();
+
+      // Render scene
+      renderer.render(scene, camera);
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    // Backend selection buttons
+    document.getElementById('btnCPU').addEventListener('click', async () => {
+      // Update button states
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnCPU').classList.add('active');
+      
+      // Initialize with CPU backend
+      await initRenderer('cpu');
+    });
+
+    document.getElementById('btnGPU').addEventListener('click', async () => {
+      // Update button states
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnGPU').classList.add('active');
+      
+      // Initialize with GPU backend
+      await initRenderer('gpu');
+    });
+
+    document.getElementById('btnAuto').addEventListener('click', async () => {
+      // Update button states
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnAuto').classList.add('active');
+      
+      // Initialize with auto backend (tries GPU, falls back to CPU)
+      await initRenderer('auto');
+    });
+
+    // Initialize with GPU backend by default
+    initRenderer('gpu');
+
+    console.log('BangBang3d Lights Example');
+    console.log('Demonstrating Lambert diffuse shading with multiple lights');
+  </script>
+</body>
+</html>

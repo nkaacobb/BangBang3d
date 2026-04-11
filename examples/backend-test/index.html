@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3D Backend Test - Phase 1</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 20px 0;
+      font-size: 24px;
+      color: #58a6ff;
+    }
+
+    #info {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 20px 0;
+      max-width: 800px;
+      white-space: pre-wrap;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+    }
+
+    button {
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: white;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #2ea043;
+    }
+
+    button:disabled {
+      background: #6e7681;
+      border-color: #6e7681;
+      cursor: not-allowed;
+    }
+
+    #canvas {
+      border: 1px solid #30363d;
+      margin: 20px 0;
+    }
+
+    .success {
+      color: #3fb950;
+    }
+
+    .error {
+      color: #f85149;
+    }
+
+    .warning {
+      color: #d29922;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>BangBang3D Backend Test - Phase 1</h1>
+    
+    <div>
+      <button id="testCPU">Test CPU Backend</button>
+      <button id="testGPU">Test GPU Backend</button>
+      <button id="testAuto">Test Auto Backend</button>
+    </div>
+
+    <canvas id="canvas" width="800" height="600"></canvas>
+    
+    <div id="info">
+Phase 1: GPU Foundation and Backend Architecture
+
+This test verifies:
+✓ Backend selection (cpu | gpu | auto)
+✓ CPU backend initialization
+✓ GPU backend initialization (WebGPU/WebGL2)
+✓ Capability detection
+✓ Graceful fallback
+✓ Backward compatibility
+
+Click a button to initialize a renderer with different backends...
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      Scene, Mesh, BoxGeometry, BasicMaterial,
+      PerspectiveCamera, BangBangRenderer, Vector3
+    } from '../../src/index.js';
+
+    const canvas = document.getElementById('canvas');
+    const infoDiv = document.getElementById('info');
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let cube = null;
+    let animationId = null;
+
+    // Helper to display info
+    function displayInfo(text) {
+      infoDiv.innerHTML = text;
+    }
+
+    // Helper to format capabilities
+    function formatCapabilities(caps) {
+      return Object.keys(caps)
+        .map(key => `  ${key}: ${caps[key]}`)
+        .join('\n');
+    }
+
+    // Create test scene
+    function createScene() {
+      scene = new Scene();
+      scene.background = 0x1a1a2e;
+
+      camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 100);
+      camera.position.z = 3;
+
+      cube = new Mesh(
+        new BoxGeometry(1, 1, 1),
+        new BasicMaterial({ color: 0x58a6ff })
+      );
+      scene.add(cube);
+    }
+
+    // Animation loop
+    function animate() {
+      if (!renderer || !renderer.isReady()) {
+        return;
+      }
+
+      cube.rotation.x += 0.01;
+      cube.rotation.y += 0.01;
+
+      renderer.render(scene, camera);
+      animationId = requestAnimationFrame(animate);
+    }
+
+    // Stop animation
+    function stopAnimation() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+
+    // Cleanup
+    function cleanup() {
+      stopAnimation();
+      if (renderer) {
+        renderer.dispose();
+        renderer = null;
+      }
+    }
+
+    // Test backend
+    async function testBackend(backendType) {
+      cleanup();
+      createScene();
+
+      displayInfo(`Testing ${backendType.toUpperCase()} backend...\n\nInitializing...`);
+
+      try {
+        // Create renderer with specified backend
+        renderer = new BangBangRenderer({
+          canvas: canvas,
+          width: 800,
+          height: 600,
+          pixelRatio: 1,
+          backend: backendType
+        });
+
+        // Wait for initialization
+        await renderer.initialize();
+
+        // Check if ready
+        if (!renderer.isReady()) {
+          throw new Error('Renderer failed to initialize');
+        }
+
+        // Get info
+        const backendTypeActual = renderer.backendType;
+        const capabilities = renderer.capabilities;
+        const debugInfo = renderer.getDebugInfo();
+
+        // Display results
+        let info = `✓ Success!\n\n`;
+        info += `Requested backend: ${backendType}\n`;
+        info += `Actual backend: ${backendTypeActual}\n\n`;
+        
+        if (backendTypeActual !== backendType && backendType !== 'auto') {
+          info += `⚠ Note: Fallback occurred (likely GPU not available)\n\n`;
+        }
+
+        info += `Capabilities:\n${formatCapabilities(capabilities)}\n\n`;
+        info += `Test scene: Rotating blue cube\n`;
+        info += `Frame: ${debugInfo.frame}\n`;
+        info += `Backend ready: ${renderer.isReady()}\n`;
+
+        displayInfo(info);
+
+        // Start animation
+        animate();
+
+      } catch (error) {
+        displayInfo(`✗ Error:\n\n${error.message}\n\n${error.stack}`);
+        console.error(error);
+      }
+    }
+
+    // Button handlers
+    document.getElementById('testCPU').addEventListener('click', () => {
+      testBackend('cpu');
+    });
+
+    document.getElementById('testGPU').addEventListener('click', () => {
+      testBackend('gpu');
+    });
+
+    document.getElementById('testAuto').addEventListener('click', () => {
+      testBackend('auto');
+    });
+
+    // Initial test with CPU (default, for backward compatibility)
+    console.log('Running initial CPU backend test...');
+    testBackend('cpu');
+  </script>
+</body>
+</html>

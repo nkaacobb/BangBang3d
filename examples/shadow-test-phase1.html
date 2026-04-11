@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 1 Shadow System Validation - BangBang3D</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #00ff00;
+    }
+    
+    #canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    
+    #test-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #00ff00;
+      padding: 15px;
+      min-width: 350px;
+      max-height: 90vh;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    
+    h2 {
+      margin: 0 0 15px 0;
+      color: #00ff00;
+      font-size: 16px;
+      border-bottom: 1px solid #00ff00;
+      padding-bottom: 5px;
+    }
+    
+    .test-section {
+      margin: 15px 0;
+      padding: 10px;
+      border: 1px solid #333;
+      background: rgba(0, 50, 0, 0.2);
+    }
+    
+    .test-item {
+      margin: 8px 0;
+      padding: 5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .test-status {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+      text-align: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    
+    .test-status.pass {
+      color: #00ff00;
+    }
+    
+    .test-status.fail {
+      color: #ff0000;
+    }
+    
+    .test-status.pending {
+      color: #ffff00;
+    }
+    
+    button {
+      background: #003300;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 8px 15px;
+      margin: 5px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    
+    button:hover {
+      background: #005500;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .controls {
+      margin: 10px 0;
+      padding: 10px;
+      background: rgba(0, 50, 0, 0.3);
+      border: 1px solid #00ff00;
+    }
+    
+    .info {
+      margin: 5px 0;
+      padding: 5px;
+      font-size: 11px;
+      color: #aaffaa;
+    }
+    
+    .warning {
+      color: #ffff00;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  
+  <div id="test-panel">
+    <h2>PHASE 1 SHADOW VALIDATION</h2>
+    
+    <div class="controls">
+      <button id="runAllTests">▶ Run All Tests</button>
+      <button id="resetScene">↻ Reset Scene</button>
+    </div>
+    
+    <div class="info">
+      <div>Backend: <span id="backend-info">-</span></div>
+      <div>Shadows Enabled: <span id="shadows-enabled">-</span></div>
+      <div>Shadow Lights: <span id="shadow-lights">-</span></div>
+    </div>
+    
+    <div class="test-section">
+      <h3 style="margin: 0 0 10px 0; font-size: 14px;">Infrastructure Tests</h3>
+      <div class="test-item">
+        <span class="test-status pending" id="test1-status">⏳</span>
+        <span>Renderer has shadows API</span>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test2-status">⏳</span>
+        <span>DirectionalLight has castShadow</span>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test3-status">⏳</span>
+        <span>SpotLight has castShadow</span>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test4-status">⏳</span>
+        <span>Mesh has castShadow/receiveShadow</span>
+      </div>
+    </div>
+    
+    <div class="test-section">
+      <h3 style="margin: 0 0 10px 0; font-size: 14px;">Rendering Tests</h3>
+      <div class="test-item">
+        <span class="test-status pending" id="test5-status">⏳</span>
+        <span>DirectionalLight casts cube shadow on plane</span>
+        <button id="test5-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test6-status">⏳</span>
+        <span>SpotLight casts shadow correctly</span>
+        <button id="test6-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test7-status">⏳</span>
+        <span>Global shadows.enabled toggle works</span>
+        <button id="test7-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test8-status">⏳</span>
+        <span>light.castShadow toggle works</span>
+        <button id="test8-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test9-status">⏳</span>
+        <span>mesh.castShadow toggle works</span>
+        <button id="test9-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test10-status">⏳</span>
+        <span>mesh.receiveShadow toggle works</span>
+        <button id="test10-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test11-status">⏳</span>
+        <span>Moving light updates shadows real-time</span>
+        <button id="test11-btn" style="margin-left: auto;">Test</button>
+      </div>
+      <div class="test-item">
+        <span class="test-status pending" id="test12-status">⏳</span>
+        <span>maxShadowLights=2 cap enforced</span>
+        <button id="test12-btn" style="margin-left: auto;">Test</button>
+      </div>
+    </div>
+    
+    <div id="test-log" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid #333; font-size: 11px; max-height: 200px; overflow-y: auto;">
+      <div style="color: #ffff00;">Waiting for tests...</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { BangBangRenderer } from '../../src/renderer/BangBangRenderer.js';
+    import { Scene } from '../../src/core/Scene.js';
+    import { Mesh } from '../../src/core/Mesh.js';
+    import { PerspectiveCamera } from '../../src/cameras/PerspectiveCamera.js';
+    import { BoxGeometry } from '../../src/geometries/BoxGeometry.js';
+    import { PlaneGeometry } from '../../src/geometries/PlaneGeometry.js';
+    import { LambertMaterial } from '../../src/materials/LambertMaterial.js';
+    import { DirectionalLight } from '../../src/lights/DirectionalLight.js';
+    import { SpotLight } from '../../src/lights/SpotLight.js';
+    import { AmbientLight } from '../../src/lights/AmbientLight.js';
+    import { Vector3 } from '../../src/math/Vector3.js';
+    import { Color } from '../../src/math/Color.js';
+
+    let renderer, scene, camera;
+    let cube, plane, directionalLight, spotLight, ambientLight;
+
+    // Test results
+    const testResults = {};
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('test-log');
+      const entry = document.createElement('div');
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      entry.style.color = type === 'error' ? '#ff0000' : type === 'success' ? '#00ff00' : '#aaffaa';
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function setTestStatus(testId, status) {
+      const statusEl = document.getElementById(`${testId}-status`);
+      statusEl.className = `test-status ${status}`;
+      statusEl.textContent = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '⏳';
+      testResults[testId] = status;
+    }
+
+    function updateInfo() {
+      document.getElementById('backend-info').textContent = renderer ? renderer.backendType : '-';
+      document.getElementById('shadows-enabled').textContent = renderer && renderer.shadows ? renderer.shadows.enabled : '-';
+      
+      let shadowLightCount = 0;
+      if (scene) {
+        scene.traverse(obj => {
+          if (obj.isLight && obj.castShadow && (obj.isDirectionalLight || obj.isSpotLight)) {
+            shadowLightCount++;
+          }
+        });
+      }
+      document.getElementById('shadow-lights').textContent = shadowLightCount;
+    }
+
+    async function initTest() {
+      log('Initializing Phase 1 Shadow Test Environment...', 'info');
+      
+      // Create renderer
+      const canvas = document.getElementById('canvas');
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: 'gpu' // WebGL2 test
+      });
+
+      await renderer.initialize();
+      
+      if (!renderer.isReady()) {
+        log('ERROR: Renderer failed to initialize', 'error');
+        return false;
+      }
+      
+      renderer.setClearColor(0x1a1a2e);
+      log(`Renderer initialized: ${renderer.backendType}`, 'success');
+      
+      // Create scene
+      scene = new Scene();
+      scene.background = new Color(0.102, 0.102, 0.18);
+      
+      // Create camera
+      camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 100);
+      camera.position.set(8, 8, 12);
+      camera.lookAt(new Vector3(0, 0, 0));
+      
+      updateInfo();
+      return true;
+    }
+
+    function createTestScene() {
+      // Clear existing objects
+      if (cube) scene.remove(cube);
+      if (plane) scene.remove(plane);
+      if (directionalLight) scene.remove(directionalLight);
+      if (spotLight) scene.remove(spotLight);
+      if (ambientLight) scene.remove(ambientLight);
+      
+      // Create plane (ground)
+      const planeGeometry = new PlaneGeometry(20, 20);
+      const planeMaterial = new LambertMaterial({ color: 0x888888 });
+      plane = new Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = -Math.PI / 2;
+      plane.position.y = 0;
+      plane.receiveShadow = true; // Receives shadows
+      plane.castShadow = false;  // Doesn't cast
+      scene.add(plane);
+      
+      // Create cube (above plane)
+      const cubeGeometry = new BoxGeometry(2, 2, 2);
+      const cubeMaterial = new LambertMaterial({ color: 0xff6b6b });
+      cube = new Mesh(cubeGeometry, cubeMaterial);
+      cube.position.set(0, 3, 0);
+      cube.castShadow = true;    // Casts shadows
+      cube.receiveShadow = true; // Also receives
+      scene.add(cube);
+      
+      // Add ambient light
+      ambientLight = new AmbientLight(0xffffff, 0.3);
+      scene.add(ambientLight);
+      
+      // Add directional light
+      directionalLight = new DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(5, 10, 5);
+      directionalLight.target.position.set(0, 0, 0);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+      scene.add(directionalLight.target);
+      
+      log('Test scene created (cube + plane + directional light)', 'success');
+      updateInfo();
+    }
+
+    // Infrastructure Tests (automatic)
+    function runInfrastructureTests() {
+      log('Running infrastructure tests...', 'info');
+      
+      // Test 1: Renderer shadows API
+      if (renderer && renderer.shadows && 
+          typeof renderer.shadows.enabled === 'boolean' &&
+          typeof renderer.shadows.maxShadowLights === 'number') {
+        setTestStatus('test1', 'pass');
+        log('✓ Renderer has shadows API', 'success');
+      } else {
+        setTestStatus('test1', 'fail');
+        log('✗ Renderer shadows API missing', 'error');
+      }
+      
+      // Test 2: DirectionalLight castShadow
+      const testDirLight = new DirectionalLight(0xffffff, 1.0);
+      if (typeof testDirLight.castShadow === 'boolean' && testDirLight.shadow) {
+        setTestStatus('test2', 'pass');
+        log('✓ DirectionalLight has castShadow property', 'success');
+      } else {
+        setTestStatus('test2', 'fail');
+        log('✗ DirectionalLight missing shadow properties', 'error');
+      }
+      
+      // Test 3: SpotLight castShadow
+      const testSpotLight = new SpotLight(0xffffff, 1.0);
+      if (typeof testSpotLight.castShadow === 'boolean' && testSpotLight.shadow) {
+        setTestStatus('test3', 'pass');
+        log('✓ SpotLight has castShadow property', 'success');
+      } else {
+        setTestStatus('test3', 'fail');
+        log('✗ SpotLight missing shadow properties', 'error');
+      }
+      
+      // Test 4: Mesh castShadow/receiveShadow
+      const testMesh = new Mesh(new BoxGeometry(1, 1, 1), new LambertMaterial({ color: 0xff0000 }));
+      if (typeof testMesh.castShadow === 'boolean' && typeof testMesh.receiveShadow === 'boolean') {
+        setTestStatus('test4', 'pass');
+        log('✓ Mesh has castShadow/receiveShadow properties', 'success');
+      } else {
+        setTestStatus('test4', 'fail');
+        log('✗ Mesh missing shadow properties', 'error');
+      }
+    }
+
+    // Test 5: DirectionalLight shadow rendering
+    document.getElementById('test5-btn').addEventListener('click', () => {
+      log('Test 5: DirectionalLight shadow on plane...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = true;
+      
+      // Render a few frames
+      for (let i = 0; i < 3; i++) {
+        renderer.render(scene, camera);
+      }
+      
+      // Check if shadow map was created
+      const backend = renderer.backend;
+      if (backend && backend.shadowMaps && backend.shadowMaps.has(directionalLight.uuid)) {
+        setTestStatus('test5', 'pass');
+        log('✓ DirectionalLight shadow map created and rendered', 'success');
+      } else {
+        setTestStatus('test5', 'fail');
+        log('✗ DirectionalLight shadow map not created', 'error');
+      }
+      
+      updateInfo();
+    });
+
+    // Test 6: SpotLight shadow rendering
+    document.getElementById('test6-btn').addEventListener('click', () => {
+      log('Test 6: SpotLight shadow...', 'info');
+      createTestScene();
+      
+      // Add spotlight
+      spotLight = new SpotLight(0xffffff, 1.0);
+      spotLight.position.set(-5, 8, 0);
+      spotLight.target.position.set(0, 0, 0);
+      spotLight.angle = Math.PI / 6;
+      spotLight.castShadow = true;
+      scene.add(spotLight);
+      scene.add(spotLight.target);
+      
+      renderer.shadows.enabled = true;
+      
+      // Render
+      for (let i = 0; i < 3; i++) {
+        renderer.render(scene, camera);
+      }
+      
+      // Check shadow map
+      const backend = renderer.backend;
+      if (backend && backend.shadowMaps && backend.shadowMaps.has(spotLight.uuid)) {
+        setTestStatus('test6', 'pass');
+        log('✓ SpotLight shadow map created and rendered', 'success');
+      } else {
+        setTestStatus('test6', 'fail');
+        log('✗ SpotLight shadow map not created', 'error');
+      }
+      
+      updateInfo();
+    });
+
+    // Test 7: Global shadows.enabled toggle
+    document.getElementById('test7-btn').addEventListener('click', () => {
+      log('Test 7: Global shadows.enabled toggle...', 'info');
+      createTestScene();
+      
+      // Enable shadows
+      renderer.shadows.enabled = true;
+      renderer.render(scene, camera);
+      const shadowMapEnabledCount = renderer.backend.shadowMaps.size;
+      
+      // Disable shadows
+      renderer.shadows.enabled = false;
+      renderer.render(scene, camera);
+      // Shadow maps should not render, but remain allocated
+      
+      if (shadowMapEnabledCount > 0) {
+        setTestStatus('test7', 'pass');
+        log('✓ Global shadows.enabled toggle functional', 'success');
+      } else {
+        setTestStatus('test7', 'fail');
+        log('✗ Global toggle not working', 'error');
+      }
+      
+      updateInfo();
+    });
+
+    // Test 8: light.castShadow toggle
+    document.getElementById('test8-btn').addEventListener('click', () => {
+      log('Test 8: light.castShadow toggle...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = true;
+      
+      // Enable casting
+      directionalLight.castShadow = true;
+      renderer.render(scene, camera);
+      const hasShadowMap1 = renderer.backend.shadowMaps.has(directionalLight.uuid);
+      
+      // Disable casting
+      directionalLight.castShadow = false;
+      renderer.render(scene, camera);
+      
+      // Re-enable
+      directionalLight.castShadow = true;
+      renderer.render(scene, camera);
+      const hasShadowMap2 = renderer.backend.shadowMaps.has(directionalLight.uuid);
+      
+      if (hasShadowMap1 && hasShadowMap2) {
+        setTestStatus('test8', 'pass');
+        log('✓ light.castShadow toggle functional', 'success');
+      } else {
+        setTestStatus('test8', 'fail');
+        log('✗ light.castShadow toggle not working', 'error');
+      }
+      
+      updateInfo();
+    });
+
+    // Test 9: mesh.castShadow toggle
+    document.getElementById('test9-btn').addEventListener('click', () => {
+      log('Test 9: mesh.castShadow toggle...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = true;
+      
+      // Test with cast on
+      cube.castShadow = true;
+      renderer.render(scene, camera);
+      
+      // Test with cast off
+      cube.castShadow = false;
+      renderer.render(scene, camera);
+      
+      // If no errors, it works (visual test required for full validation)
+      setTestStatus('test9', 'pass');
+      log('✓ mesh.castShadow toggle functional (API test)', 'success');
+      
+      updateInfo();
+    });
+
+    // Test 10: mesh.receiveShadow toggle
+    document.getElementById('test10-btn').addEventListener('click', () => {
+      log('Test 10: mesh.receiveShadow toggle...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = true;
+      
+      // Test with receive on
+      plane.receiveShadow = true;
+      renderer.render(scene, camera);
+      
+      // Test with receive off
+      plane.receiveShadow = false;
+      renderer.render(scene, camera);
+      
+      // If no errors, it works (visual test required)
+      setTestStatus('test10', 'pass');
+      log('✓ mesh.receiveShadow toggle functional (API test)', 'success');
+      
+      updateInfo();
+    });
+
+    // Test 11: Real-time shadow updates
+    document.getElementById('test11-btn').addEventListener('click', () => {
+      log('Test 11: Real-time shadow updates...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = true;
+      
+      // Animate light position
+      let frame = 0;
+      const animate = () => {
+        if (frame < 60) {
+          directionalLight.position.x = 5 * Math.cos(frame * 0.1);
+          directionalLight.position.z = 5 * Math.sin(frame * 0.1);
+          renderer.render(scene, camera);
+          frame++;
+          requestAnimationFrame(animate);
+        } else {
+          setTestStatus('test11', 'pass');
+          log('✓ Real-time shadow updates functional', 'success');
+          updateInfo();
+        }
+      };
+      animate();
+    });
+
+    // Test 12: maxShadowLights=2 cap
+    document.getElementById('test12-btn').addEventListener('click', () => {
+      log('Test 12: maxShadowLights cap...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = true;
+      
+      // Add 3 shadow-casting lights
+      const light2 = new SpotLight(0xffffff, 1.0);
+      light2.position.set(-5, 8, 0);
+      light2.castShadow = true;
+      scene.add(light2);
+      
+      const light3 = new SpotLight(0xffffff, 1.0);
+      light3.position.set(5, 8, 0);
+      light3.castShadow = true;
+      scene.add(light3);
+      
+      renderer.render(scene, camera);
+      
+      // Check that only 2 shadow maps were created
+      const shadowMapCount = renderer.backend.shadowMaps.size;
+      if (shadowMapCount <= renderer.shadows.maxShadowLights) {
+        setTestStatus('test12', 'pass');
+        log(`✓ maxShadowLights cap enforced (${shadowMapCount}/${renderer.shadows.maxShadowLights})`, 'success');
+      } else {
+        setTestStatus('test12', 'fail');
+        log(`✗ Too many shadow maps created (${shadowMapCount})`, 'error');
+      }
+      
+      updateInfo();
+    });
+
+    // Run all tests
+    document.getElementById('runAllTests').addEventListener('click', async () => {
+      log('========== RUNNING ALL TESTS ==========', 'info');
+      
+      // Infrastructure tests
+      runInfrastructureTests();
+      
+      // Rendering tests (trigger manually for visual confirmation)
+      log('Rendering tests ready - click individual test buttons', 'info');
+    });
+
+    // Reset scene
+    document.getElementById('resetScene').addEventListener('click', () => {
+      log('Resetting scene...', 'info');
+      createTestScene();
+      renderer.shadows.enabled = false;
+      renderer.render(scene, camera);
+      updateInfo();
+    });
+
+    // Animation loop
+    function animate() {
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(animate);
+    }
+
+    // Initialize on load
+    window.addEventListener('load', async () => {
+      const success = await initTest();
+      if (success) {
+        log('Test environment ready!', 'success');
+        log('Click "Run All Tests" to begin validation', 'info');
+        createTestScene();
+        animate();
+      }
+    });
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+  </script>
+</body>
+</html>

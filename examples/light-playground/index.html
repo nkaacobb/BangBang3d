@@ -1,0 +1,3394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lighting Playground - BangBang3D</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      overflow: hidden;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+    
+    canvas {
+      display: block;
+      cursor: crosshair;
+    }
+    
+    canvas.dragging {
+      cursor: move;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 13px;
+      max-width: 280px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      backdrop-filter: blur(10px);
+    }
+    
+    .panel-header {
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #58a6ff;
+      background: rgba(88, 166, 255, 0.1);
+      border-bottom: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .panel-header:hover {
+      background: rgba(88, 166, 255, 0.15);
+    }
+    
+    .panel-collapse-icon {
+      font-size: 10px;
+      transition: transform 0.2s;
+    }
+    
+    .panel-collapsed .panel-collapse-icon {
+      transform: rotate(-90deg);
+    }
+    
+    .panel-content {
+      padding: 15px;
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    
+    .panel-collapsed .panel-content {
+      max-height: 0;
+      padding: 0 15px;
+    }
+    
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+    
+    p {
+      margin: 6px 0;
+      line-height: 1.5;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    
+    .axis-labels {
+      margin: 10px 0;
+      padding: 8px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+    }
+    
+    .axis-x { color: #ff6b6b; font-weight: 600; }
+    .axis-y { color: #51cf66; font-weight: 600; }
+    .axis-z { color: #339af0; font-weight: 600; }
+    
+    .controls {
+      margin: 8px 0;
+      font-size: 12px;
+    }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 210px;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      backdrop-filter: blur(10px);
+      max-width: 240px;
+    }
+
+    #controls .panel-content {
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+    }
+    
+    button {
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    
+    button:hover {
+      background: #30363d;
+      border-color: #58a6ff;
+    }
+    
+    button.danger {
+      border-color: #da3633;
+      color: #ff7b72;
+    }
+    
+    button.danger:hover {
+      background: #3d1615;
+      border-color: #ff7b72;
+    }
+    
+    button.light-btn {
+      font-size: 11px;
+      padding: 6px 8px;
+      display: block;
+      width: 100%;
+    }
+    
+    .section-title {
+      font-weight: 600;
+      color: #c9d1d9;
+      margin: 12px 0 8px;
+      text-align: center;
+      font-size: 11px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 12px;
+      white-space: nowrap;
+    }
+    
+    .section-title:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+    
+    #properties-panel {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      min-width: 250px;
+      max-width: 320px;
+      backdrop-filter: blur(10px);
+    }
+    
+    #no-selection {
+      color: #8b949e;
+      font-style: italic;
+      font-size: 13px;
+    }
+    
+    #properties-content {
+      display: none;
+    }
+    
+    .prop-header {
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 10px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+      padding-bottom: 6px;
+    }
+    
+    .prop-group {
+      margin: 10px 0;
+    }
+    
+    .prop-label {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+      display: block;
+    }
+    
+    input[type="color"] {
+      width: 100%;
+      height: 32px;
+      cursor: pointer;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      background: #21262d;
+      padding: 2px;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #30363d;
+      outline: none;
+      margin: 6px 0;
+    }
+    
+    input[type="number"] {
+      width: 100%;
+      padding: 6px 8px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      font-size: 12px;
+    }
+    
+    .range-value {
+      font-size: 11px;
+      color: #79c0ff;
+      font-family: 'Courier New', monospace;
+      text-align: right;
+      margin-top: 2px;
+    }
+    
+    #spatial-inspector {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      backdrop-filter: blur(10px);
+    }
+    
+    .inspector-title {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 0;
+      text-align: center;
+    }
+    
+    #schematic-canvas {
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      background: #0d1117;
+    }
+    
+    .position-display {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #79c0ff;
+      margin: 6px 0;
+    }
+    
+    .btn-group {
+      display: flex;
+      gap: 4px;
+      margin: 8px 0;
+    }
+    
+    .btn-group button {
+      flex: 1;
+      font-size: 10px;
+      padding: 5px;
+    }
+    
+    #scene-tree {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      backdrop-filter: blur(10px);
+      min-width: 165px;
+    }
+    
+    #scene-tree .panel-content {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    
+    .tree-header {
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 0;
+      font-size: 13px;
+      text-align: center;
+      border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+      padding-bottom: 6px;
+    }
+    
+    .tree-section {
+      margin: 12px 0;
+    }
+    
+    .tree-section-title {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    
+    .tree-item {
+      padding: 6px 8px;
+      margin: 2px 0;
+      background: rgba(33, 38, 45, 0.5);
+      border: 1px solid transparent;
+      border-radius: 3px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #c9d1d9;
+    }
+    
+    .tree-item:hover {
+      background: rgba(48, 54, 61, 0.8);
+      border-color: rgba(88, 166, 255, 0.3);
+    }
+    
+    .tree-item.selected {
+      background: rgba(88, 166, 255, 0.2);
+      border-color: #58a6ff;
+      color: #58a6ff;
+    }
+    
+    .tree-item-icon {
+      display: inline-block;
+      width: 12px;
+      margin-right: 6px;
+      text-align: center;
+    }
+    
+    .light-toggle {
+      float: right;
+      width: 16px;
+      height: 16px;
+      padding: 2px;
+      margin: 0 0 0 4px;
+      font-size: 10px;
+      line-height: 12px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 2px;
+      background: rgba(88, 166, 255, 0.2);
+      border: 1px solid rgba(88, 166, 255, 0.4);
+    }
+    
+    .light-toggle.disabled {
+      background: rgba(139, 148, 158, 0.2);
+      border-color: rgba(139, 148, 158, 0.4);
+      opacity: 0.5;
+    }
+    
+    .light-toggle:hover {
+      background: rgba(88, 166, 255, 0.4);
+    }
+    
+    .visibility-toggle {
+      float: right;
+      width: 16px;
+      height: 16px;
+      padding: 2px;
+      margin: 0;
+      font-size: 10px;
+      line-height: 12px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 2px;
+      background: rgba(255, 215, 0, 0.2);
+      border: 1px solid rgba(255, 215, 0, 0.4);
+    }
+    
+    .visibility-toggle.hidden {
+      background: rgba(139, 148, 158, 0.2);
+      border-color: rgba(139, 148, 158, 0.4);
+      opacity: 0.5;
+    }
+    
+    .visibility-toggle:hover {
+      background: rgba(255, 215, 0, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <div class="panel-header" onclick="togglePanel('info')">
+      <span>Lighting Playground</span>
+      <span class="panel-collapse-icon">▼</span>
+    </div>
+    <div class="panel-content">
+      <p style="margin-top: 0;">Interactive light creation and manipulation</p>
+      
+      <div class="axis-labels">
+        <div>Axes: <span class="axis-x">X (Red)</span> · <span class="axis-y">Y (Green)</span> · <span class="axis-z">Z (Blue)</span></div>
+      </div>
+      
+      <div class="controls">
+        <p><strong>Camera Controls:</strong></p>
+        <p>• Left drag: Rotate</p>
+        <p>• Right drag: Pan</p>
+        <p>• Wheel: Zoom</p>
+      </div>
+      
+      <div class="controls">
+        <p><strong>Light Controls:</strong></p>
+        <p>• Click light to select</p>
+        <p>• Drag to move (XY plane)</p>
+        <p>• Ctrl+Drag: Move Z axis</p>
+        <p>• Shift+Drag: Rotate</p>
+        <p>• Edit properties in panel</p>
+        <p>• ✔/✖ toggle enables/disables light</p>
+      </div>
+      
+      <div class="controls">
+        <p><strong>Material Controls (Phase 2 & 3):</strong></p>
+        <p>• Select object to edit material</p>
+        <p>• Switch material types (Basic, Lambert, PBR, Debug)</p>
+        <p>• Apply procedural textures (7 types)</p>
+        <p>• Adjust PBR properties (metallic, roughness)</p>
+        <p>• Use presets for quick testing</p>
+      </div>
+      
+      <div class="controls" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+        <p><strong>Note:</strong> All light types dynamically affect object shading. Move lights around to see real-time lighting changes!</p>
+      </div>
+    </div>
+  </div>
+  
+  <div id="controls">
+    <div class="panel-header" onclick="togglePanel('controls')">
+      <span>Add Lights</span>
+      <span class="panel-collapse-icon">▼</span>
+    </div>
+    <div class="panel-content">
+      <button id="btnAddPoint" class="light-btn">+ Point</button>
+      <button id="btnAddSpot" class="light-btn">+ Spot</button>
+      <button id="btnAddDirectional" class="light-btn">+ Directional</button>
+      <button id="btnAddHemisphere" class="light-btn">+ Hemisphere</button>
+      <button id="btnAddAmbient" class="light-btn">+ Ambient</button>
+      
+      <div class="section-title">Test Objects</div>
+      <button id="btnAddSphere">Add Sphere</button>
+      <button id="btnAddCube">Add Cube</button>
+      
+      <div class="section-title">Material Presets (Phase 3)</div>
+      <button id="btnPresetGold">Gold (PBR)</button>
+      <button id="btnPresetPlastic">Plastic (PBR)</button>
+      <button id="btnPresetWood">Wood (PBR)</button>
+      <button id="btnPresetMetal">Brushed Metal (PBR)</button>
+      
+      <div class="section-title">Shadows (Phase 1)</div>
+      <button id="btnToggleShadows">Enable Shadows</button>
+      <div id="shadow-warning" style="display: none; margin: 8px 0; padding: 8px; background: rgba(255, 180, 0, 0.2); border: 1px solid rgba(255, 180, 0, 0.5); border-radius: 4px; font-size: 11px; color: #ffcc00;">
+        ⚠ Shadows only work in WebGL2 (Phase 1)
+      </div>
+      
+      <div class="section-title">Reflections (Phase 5)</div>
+      <div style="margin-bottom:6px;">
+        <label style="font-size:11px;color:#8b949e;">Environment Map:</label>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
+          <button id="btnEnvNone" class="active" style="font-size:10px;padding:4px 8px;">None</button>
+          <button id="btnEnvSky" style="font-size:10px;padding:4px 8px;">Sky</button>
+          <button id="btnEnvStudio" style="font-size:10px;padding:4px 8px;">Studio</button>
+          <button id="btnEnvSunset" style="font-size:10px;padding:4px 8px;">Sunset</button>
+        </div>
+      </div>
+      <div style="margin-bottom:6px;">
+        <label style="font-size:11px;">Env Intensity: <span id="envIntensityVal">1.0</span>
+          <input type="range" id="envIntensity" min="0" max="3" value="1.0" step="0.1" style="width:100%;">
+        </label>
+      </div>
+      <button id="btnAddReflectionProbe">Add Reflection Probe</button>
+      <button id="btnCaptureProbe" style="display:none;">Capture Probe</button>
+      <div id="probe-status" style="margin: 4px 0; font-size: 11px; color: #8b949e;"></div>
+
+      <div class="section-title">Screen-Space Reflections</div>
+      <button id="btnToggleSSR">Enable SSR</button>
+      <button id="btnSSRDemoSetup" style="margin-top:4px;">SSR Demo Setup</button>
+      <div id="ssr-status" style="margin: 4px 0; font-size: 11px; color: #8b949e;"></div>
+
+      <div class="section-title">Retro B/W Dither (PostFX)</div>
+      <button id="btnToggleDither">Enable Dither</button>
+      <div id="dither-controls" style="display:none;">
+        <div style="margin-top:6px;">
+          <label style="font-size:11px;">Strength: <span id="ditherStrVal">1.00</span>
+            <input type="range" id="ditherStrength" min="0" max="1" value="1" step="0.01" style="width:100%;">
+          </label>
+          <label style="font-size:11px;">Threshold Bias: <span id="ditherBiasVal">0.00</span>
+            <input type="range" id="ditherBias" min="-0.5" max="0.5" value="0" step="0.01" style="width:100%;">
+          </label>
+          <label style="font-size:11px;">Matrix Size:
+            <select id="ditherMatrix" style="font-size:11px;background:#1a1a2e;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;">
+              <option value="4">4×4 Bayer</option>
+              <option value="8" selected>8×8 Bayer</option>
+            </select>
+          </label>
+          <label style="font-size:11px; display:block; margin-top:4px;">
+            <input type="checkbox" id="ditherInvert"> Invert (white on black)
+          </label>
+          <button id="btnDitherMacPaint" style="margin-top:4px;">MacPaint Preset</button>
+        </div>
+      </div>
+
+      <div class="section-title">Cameras</div>
+      <button id="btnAddCamera">+ Camera</button>
+      <button id="btnCameraDemoSetup" style="margin-top:4px;">Camera Demo Setup</button>
+      <div id="ssr-controls" style="display:none;">
+        <label style="font-size:11px;">Debug View:
+          <select id="ssrDebugView" style="font-size:11px;background:#1a1a2e;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;">
+            <option value="final" selected>Final</option>
+            <option value="ssr-only">SSR Only</option>
+            <option value="ssr-mask">SSR Mask</option>
+            <option value="normals">Normals</option>
+            <option value="depth">Depth</option>
+          </select>
+        </label>
+        <div style="margin-top:6px;">
+          <label style="font-size:11px;">Steps: <span id="ssrStepVal">64</span>
+            <input type="range" id="ssrStepCount" min="16" max="128" value="64" step="8" style="width:100%;">
+          </label>
+          <label style="font-size:11px;">Max Distance: <span id="ssrDistVal">20</span>
+            <input type="range" id="ssrMaxDist" min="1" max="80" value="20" step="1" style="width:100%;">
+          </label>
+          <label style="font-size:11px;">Thickness: <span id="ssrThickVal">0.30</span>
+            <input type="range" id="ssrThickness" min="0.05" max="2.0" value="0.30" step="0.05" style="width:100%;">
+          </label>
+          <label style="font-size:11px;">Roughness Fade: <span id="ssrRoughVal">0.40</span>
+            <input type="range" id="ssrRoughFade" min="0.1" max="1.0" value="0.40" step="0.05" style="width:100%;">
+          </label>
+          <label style="font-size:11px;">Confidence Threshold: <span id="ssrConfVal">0.10</span>
+            <input type="range" id="ssrConfidence" min="0.0" max="0.5" value="0.10" step="0.01" style="width:100%;">
+          </label>
+        </div>
+      </div>
+      
+      <div class="section-title">Backend</div>
+      <div style="margin: 8px 0; padding: 8px; background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 4px; font-size: 11px;">
+        <div>Active: <span id="backend-indicator" style="color: #58a6ff; font-weight: bold;">-</span></div>
+      </div>
+      <button id="btnForceWebGL2">Force WebGL2</button>
+      
+      <div class="section-title">Actions</div>
+      <button id="btnToggleGrid">Hide Grid</button>
+      <button id="btnExportScene">📥 Export Scene</button>
+      <button id="btnImportScene">📤 Import Scene</button>
+      <input type="file" id="importFileInput" accept=".json" style="display: none;">
+      <button id="btnClearLights">Clear Lights</button>
+      <button id="btnClearAll" class="danger">Clear All</button>
+    </div>
+  </div>
+  
+  <div id="scene-tree">
+    <div class="panel-header" onclick="togglePanel('scene-tree')">
+      <span>Scene Hierarchy</span>
+      <span class="panel-collapse-icon">▼</span>
+    </div>
+    <div class="panel-content">
+      <div class="tree-section">
+        <div class="tree-section-title">Lights</div>
+        <div id="lights-list"></div>
+      </div>
+      <div class="tree-section">
+        <div class="tree-section-title">Objects</div>
+        <div id="objects-list"></div>
+      </div>
+      <div class="tree-section">
+        <div class="tree-section-title">Cameras</div>
+        <div id="cameras-list"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="properties-panel">
+    <div id="no-selection">Nothing selected</div>
+    <div id="properties-content">
+      <div class="prop-header" id="light-name">Point Light 1</div>
+      
+      <div id="props-container"></div>
+      
+      <div class="prop-group">
+        <div class="position-display">
+          Position: <span id="light-pos"></span>
+        </div>
+      </div>
+      
+      <div class="btn-group">
+        <button id="btnDuplicate">Duplicate</button>
+        <button id="btnDelete" class="danger">Delete</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="spatial-inspector">
+    <div class="panel-header" onclick="togglePanel('spatial-inspector')">
+      <span>Spatial Inspector</span>
+      <span class="panel-collapse-icon">▼</span>
+    </div>
+    <div class="panel-content">
+      <canvas id="schematic-canvas" width="200" height="200"></canvas>
+    </div>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      BasicMaterial,
+      LambertMaterial,
+      PBRMaterial,
+      DebugMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      Vector2,
+      Vector3,
+      Color,
+      GridOverlay,
+      Raycaster,
+      AmbientLight,
+      PointLight,
+      SpotLight,
+      DirectionalLight,
+      HemisphereLight,
+      PointLightHelper,
+      SpotLightHelper,
+      DirectionalLightHelper,
+      HemisphereLightHelper,
+      Object3D,
+      TextureLoader,
+      MaterialSerializer,
+      ReflectionProbe,
+      CubeTexture,
+      PostFXPipeline,
+      DitherPass,
+      CameraHelper
+    } from '../../src/index.js';
+    
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // Toggle panel collapse
+    window.togglePanel = function(panelId) {
+      const panel = document.getElementById(panelId);
+      panel.classList.toggle('panel-collapsed');
+    };
+
+    // Global variables
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let gridOverlay = null;
+    let animationId = null;
+    let raycaster = new Raycaster();
+    let textureLoader = new TextureLoader();
+    let materialSerializer = new MaterialSerializer();
+    let reflectionProbe = null;  // Single reflection probe for the scene
+    let currentEnvMap = 'none';   // Environment map type: 'sky', 'studio', 'sunset', 'none'
+    
+    // Light and object management
+    let lights = [];
+    let lightHelpers = [];
+    let sceneObjects = [];
+    let selectedLight = null;
+    let lightCounter = { point: 0, spot: 0, directional: 0, hemisphere: 0, ambient: 0 };
+    let objectCounter = { sphere: 0, cube: 0 };
+    
+    // Mouse state
+    let isDraggingLight = false;
+    let mouseDownOnLight = false;
+    let dragStartPos = new Vector2();
+    let dragStartLightPos = new Vector3();
+    let mouse = new Vector2();
+    let dragStartRotation = { x: 0, y: 0, z: 0 };
+    let isRotating = false;
+
+    // Camera management
+    let sceneCameras = [];        // Extra cameras added via UI (NOT the main camera)
+    let cameraHelpers = [];       // CameraHelper instances parallel to sceneCameras[]
+    let selectedCamera = null;    // Currently selected camera in hierarchy
+    let cameraCounter = 0;
+    let ditherEnabled = false;    // Global dither toggle for the active camera
+
+    // Initialize renderer
+    async function initRenderer(backendType = 'gpu') {
+      console.log(`Initializing ${backendType} backend...`);
+
+      const canvas = document.getElementById('canvas');
+
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: backendType
+      });
+
+      await renderer.initialize();
+      
+      if (!renderer.isReady()) {
+        console.error('Renderer failed to initialize');
+        return;
+      }
+      
+      renderer.setClearColor(0x1a1a2e);
+      
+      console.log('Backend initialized:', renderer.backendType);
+      
+      updateBackendIndicator();
+
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      if (!animationId) {
+        animate(performance.now());
+      }
+    }
+
+    // Update backend indicator and show warnings
+    function updateBackendIndicator() {
+      const indicator = document.getElementById('backend-indicator');
+      const warning = document.getElementById('shadow-warning');
+      
+      if (renderer) {
+        indicator.textContent = renderer.backendType.toUpperCase();
+        
+        // Show warning if shadows enabled on non-WebGL2 backend
+        if (renderer.shadows && renderer.shadows.enabled && renderer.backendType !== 'webgl2') {
+          warning.style.display = 'block';
+        } else {
+          warning.style.display = 'none';
+        }
+      } else {
+        indicator.textContent = 'NONE';
+        warning.style.display = 'none';
+      }
+    }
+    
+    // Ensure ground plane exists for shadow receiving
+    function ensureGroundPlane() {
+      // Check if we already have a ground plane
+      let hasReceiver = false;
+      sceneObjects.forEach(obj => {
+        if (obj.receiveShadow) {
+          hasReceiver = true;
+        }
+      });
+      
+      // If no receiver, create a ground plane
+      if (!hasReceiver) {
+        const planeGeometry = new PlaneGeometry(30, 30);
+        const planeMaterial = new LambertMaterial({ color: 0x333333 });
+        const groundPlane = new Mesh(planeGeometry, planeMaterial);
+        groundPlane.rotation.x = -Math.PI / 2;
+        groundPlane.position.y = 0;
+        groundPlane.castShadow = false;
+        groundPlane.receiveShadow = true;
+        groundPlane.userData.name = 'Ground Plane';
+        groundPlane.userData.originalColor = 0x333333;
+        groundPlane.userData.isGroundPlane = true; // Mark as auto-created
+        scene.add(groundPlane);
+        sceneObjects.push(groundPlane);
+        updateSceneTree();
+        console.log('Auto-created ground plane for shadow receiving');
+      }
+    }
+
+    // Create scene
+    function createScene() {
+      scene = new Scene();
+      scene.background = new Color(0.102, 0.102, 0.18); // #1a1a2e
+
+      camera = new PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.5,
+        100
+      );
+      camera.position.set(6.85, 10.72, 16.87);
+      camera.lookAt(new Vector3(0, 0, 0));
+      
+      // Create infinite grid overlay
+      gridOverlay = new GridOverlay({
+        yPosition: 0.0,
+        gridScale: 1.0,
+        gridOpacity: 0.8,
+        fadeDistance: 100.0,
+        adaptive: false,
+        axisXColor: { r: 1.0, g: 0.2, b: 0.2 }, // Red X axis
+        axisZColor: { r: 0.2, g: 1.0, b: 0.2 }, // Green Z axis
+        horizonColor: { r: 0.102, g: 0.102, b: 0.18 },
+        gridColor: { r: 0.4, g: 0.4, b: 0.4 }
+      });
+      gridOverlay.addToScene(scene);
+      
+      // Add default ambient light
+      addLight('ambient');
+    }
+
+    // Add light to scene
+    function addLight(type) {
+      let light, helper;
+      
+      switch(type) {
+        case 'point':
+          lightCounter.point++;
+          light = new PointLight(0xffffff, 1.5);
+          light.distance = 20;
+          light.decay = 2;
+          light.position.set(
+            (Math.random() - 0.5) * 4,
+            2 + Math.random() * 2,
+            (Math.random() - 0.5) * 4
+          );
+          light.userData.name = `Point Light ${lightCounter.point}`;
+          light.userData.type = 'point';
+          helper = new PointLightHelper(light, 0.3);
+          break;
+          
+        case 'spot':
+          lightCounter.spot++;
+          light = new SpotLight(0xffffff, 1.5);
+          light.angle = Math.PI / 6;
+          light.penumbra = 0.2;
+          light.distance = 15;
+          light.decay = 2;
+          light.position.set(
+            (Math.random() - 0.5) * 4,
+            3 + Math.random() * 2,
+            (Math.random() - 0.5) * 4
+          );
+          // Create target object - aim at selected object or origin
+          light.target = new Object3D();
+          if (selectedObject) {
+            light.target.position.copy(selectedObject.position);
+          } else {
+            light.target.position.set(0, 0, 0); // Aim at origin
+          }
+          scene.add(light.target);
+          light.userData.name = `Spot Light ${lightCounter.spot}`;
+          light.userData.type = 'spot';
+          helper = new SpotLightHelper(light);
+          break;
+          
+        case 'directional':
+          lightCounter.directional++;
+          light = new DirectionalLight(0xffffff, 0.8);
+          light.position.set(
+            (Math.random() - 0.5) * 8,
+            5 + Math.random() * 3,
+            (Math.random() - 0.5) * 8
+          );
+          light.target = new Vector3(0, 0, 0);
+          light.userData.name = `Directional Light ${lightCounter.directional}`;
+          light.userData.type = 'directional';
+          helper = new DirectionalLightHelper(light, 1.5);
+          break;
+          
+        case 'hemisphere':
+          lightCounter.hemisphere++;
+          light = new HemisphereLight(0x87CEEB, 0x8B4513, 0.6);
+          light.position.set(0, 5, 0);
+          light.userData.name = `Hemisphere Light ${lightCounter.hemisphere}`;
+          light.userData.type = 'hemisphere';
+          helper = new HemisphereLightHelper(light, 1.2);
+          break;
+          
+        case 'ambient':
+          lightCounter.ambient++;
+          light = new AmbientLight(0xaaaaaa, 1.0);
+          light.userData.name = `Ambient Light ${lightCounter.ambient}`;
+          light.userData.type = 'ambient';
+          helper = null; // Ambient lights don't have helpers
+          break;
+      }
+      
+      scene.add(light);
+      lights.push(light);
+      
+      // Add enabled property
+      light.enabled = true;
+      
+      // Phase 1: Auto-enable castShadow for directional and spot lights if shadows are globally enabled
+      if (renderer && renderer.shadows && renderer.shadows.enabled) {
+        if (type === 'directional' || type === 'spot') {
+          light.castShadow = true;
+          console.log(`✓ ${light.userData.name} added with castShadow=true (shadows enabled)`);
+        } else {
+          console.log(`✓ ${light.userData.name} added and active`);
+        }
+      } else {
+        console.log(`✓ ${light.userData.name} added and active`);
+      }
+      
+      if (helper) {
+        // Add helper to scene directly (not as child of light)
+        scene.add(helper);
+        lightHelpers.push(helper);
+      }
+      
+      updateSceneTree();
+      return light;
+    }
+
+    // Add test object to scene
+    function addObject(type) {
+      let geometry, material, object;
+      const colors = [
+        0xff6b6b, // Red
+        0x51cf66, // Green
+        0x339af0, // Blue
+        0xfeca57, // Yellow
+        0xee5a6f, // Pink
+        0x48dbfb  // Cyan
+      ];
+      const colorIndex = sceneObjects.length % colors.length;
+      
+      if (type === 'sphere') {
+        objectCounter.sphere++;
+        geometry = new SphereGeometry(0.8, 32, 24);
+        material = new LambertMaterial({ color: colors[colorIndex] });
+        object = new Mesh(geometry, material);
+        object.userData.name = `Sphere ${objectCounter.sphere}`;
+      } else if (type === 'cube') {
+        objectCounter.cube++;
+        geometry = new BoxGeometry(1.5, 1.5, 1.5);
+        material = new LambertMaterial({ color: colors[colorIndex] });
+        object = new Mesh(geometry, material);
+        object.userData.name = `Cube ${objectCounter.cube}`;
+      }
+      
+      object.position.set(
+        (Math.random() - 0.5) * 4,
+        type === 'cube' ? 1.5 : 1.0, // Lift cubes and spheres above ground
+        (Math.random() - 0.5) * 4
+      );
+      
+      // Phase 1: Default shadow flags when shadows are enabled
+      if (renderer && renderer.shadows && renderer.shadows.enabled) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+      
+      object.userData.originalColor = colors[colorIndex];
+      scene.add(object);
+      sceneObjects.push(object);
+      
+      updateSceneTree();
+      return object;
+    }
+
+    // ─── Camera Management ────────────────────────────────────────────
+
+    function addSceneCamera() {
+      cameraCounter++;
+      const cam = new PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.5,
+        100
+      );
+      cam.userData.name = `Camera ${cameraCounter}`;
+      cam.userData.type = 'perspective';
+
+      // Place camera at a random offset from current view
+      cam.position.set(
+        (Math.random() - 0.5) * 10,
+        3 + Math.random() * 5,
+        5 + Math.random() * 10
+      );
+      cam.lookAt(new Vector3(0, 0, 0));
+
+      scene.addCamera(cam);
+      sceneCameras.push(cam);
+
+      // Create frustum helper
+      const helper = new CameraHelper(cam, { color: 0xffaa00 });
+      scene.add(helper);
+      cameraHelpers.push(helper);
+
+      console.log(`✓ ${cam.userData.name} added`);
+      updateSceneTree();
+      return cam;
+    }
+
+    function removeSelectedCamera() {
+      if (!selectedCamera) return;
+      const idx = sceneCameras.indexOf(selectedCamera);
+      if (idx !== -1) {
+        scene.removeCamera(selectedCamera);
+        scene.remove(selectedCamera);
+        sceneCameras.splice(idx, 1);
+
+        // Remove helper
+        if (cameraHelpers[idx]) {
+          scene.remove(cameraHelpers[idx]);
+          cameraHelpers[idx].dispose();
+          cameraHelpers.splice(idx, 1);
+        }
+
+        // If this was the active view camera, revert to main
+        if (scene.activeCamera === selectedCamera) {
+          scene.activeCamera = camera;
+        }
+
+        selectedCamera = null;
+        updatePropertiesPanel();
+        updateSceneTree();
+      }
+    }
+
+    function selectCamera(cam) {
+      selectedLight = null;
+      selectedObject = null;
+      selectedCamera = cam;
+      updatePropertiesPanel();
+      updateSceneTree();
+    }
+
+    function setActiveCamera(cam) {
+      scene.setActiveCamera(cam);
+      // Switch OrbitControls to the new camera
+      if (controls) {
+        controls.object = cam;
+      }
+      console.log(`Active camera set to: ${cam.userData.name || cam.type}`);
+    }
+
+    function cameraDemoSetup() {
+      // Clear existing cameras
+      sceneCameras.forEach((cam, i) => {
+        scene.removeCamera(cam);
+        scene.remove(cam);
+        if (cameraHelpers[i]) {
+          scene.remove(cameraHelpers[i]);
+          cameraHelpers[i].dispose();
+        }
+      });
+      sceneCameras = [];
+      cameraHelpers = [];
+      cameraCounter = 0;
+
+      // Add a couple of test objects if scene is empty
+      if (sceneObjects.length === 0) {
+        addObject('sphere');
+        addObject('cube');
+      }
+      if (lights.length === 0) {
+        addLight('ambient');
+        addLight('point');
+      }
+
+      // Camera A — normal view from front-right
+      const camA = addSceneCamera();
+      camA.userData.name = 'Camera A (Normal)';
+      camA.position.set(8, 6, 10);
+      camA.lookAt(new Vector3(0, 0, 0));
+
+      // Camera B — dithered view from left
+      const camB = addSceneCamera();
+      camB.userData.name = 'Camera B (Dithered)';
+      camB.position.set(-10, 5, 5);
+      camB.lookAt(new Vector3(0, 0, 0));
+      camB.setPostFXProfileSync(PostFXPipeline, 'mac_dither', { strength: 1.0, matrixSize: 8 });
+
+      updateSceneTree();
+      console.log('✓ Camera demo setup complete: Camera A (normal), Camera B (dithered)');
+    }
+
+    // ─── Dither Toggle ────────────────────────────────────────────────
+
+    // ─── Environment Map (IBL Reflections) ────────────────────────────
+
+    function generateProceduralCubeFaces(type, size = 128) {
+      const faces = [];
+      for (let f = 0; f < 6; f++) {
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+
+        if (type === 'sky') {
+          const grad = ctx.createLinearGradient(0, 0, 0, size);
+          if (f === 2) {
+            grad.addColorStop(0, '#4488ff'); grad.addColorStop(1, '#66aaff');
+          } else if (f === 3) {
+            grad.addColorStop(0, '#445533'); grad.addColorStop(1, '#223311');
+          } else {
+            grad.addColorStop(0, '#6699ee'); grad.addColorStop(0.5, '#aaccff'); grad.addColorStop(1, '#445533');
+          }
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
+        } else if (type === 'studio') {
+          const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.7);
+          if (f === 2) {
+            grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#888888');
+          } else if (f === 3) {
+            grad.addColorStop(0, '#444444'); grad.addColorStop(1, '#222222');
+          } else {
+            grad.addColorStop(0, '#999999'); grad.addColorStop(1, '#333333');
+          }
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
+        } else if (type === 'sunset') {
+          const grad = ctx.createLinearGradient(0, 0, 0, size);
+          if (f === 2) {
+            grad.addColorStop(0, '#110033'); grad.addColorStop(1, '#553388');
+          } else if (f === 3) {
+            grad.addColorStop(0, '#332200'); grad.addColorStop(1, '#111100');
+          } else {
+            grad.addColorStop(0, '#553388'); grad.addColorStop(0.3, '#ff6633');
+            grad.addColorStop(0.6, '#ffaa33'); grad.addColorStop(1, '#332200');
+          }
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, size, size);
+        }
+        faces.push(c);
+      }
+      return faces;
+    }
+
+    function buildCubeTexture(envType) {
+      if (envType === 'none') return null;
+      const faces = generateProceduralCubeFaces(envType, 128);
+      const cube = new CubeTexture();
+      cube.setImages(faces);
+      cube.name = envType + '_env';
+      return cube;
+    }
+
+    function applyEnvironment() {
+      if (!scene) return;
+      const cube = buildCubeTexture(currentEnvMap);
+      scene.environment = cube;
+      scene.environmentIntensity = parseFloat(document.getElementById('envIntensity').value);
+      // Update buttons
+      ['None', 'Sky', 'Studio', 'Sunset'].forEach(label => {
+        const btn = document.getElementById('btnEnv' + label);
+        if (btn) btn.classList.toggle('active', label.toLowerCase() === currentEnvMap);
+      });
+    }
+
+    function toggleDither() {
+      ditherEnabled = !ditherEnabled;
+      const btn = document.getElementById('btnToggleDither');
+      const ditherUI = document.getElementById('dither-controls');
+
+      if (ditherEnabled) {
+        btn.textContent = 'Disable Dither';
+        btn.style.background = 'rgba(255, 215, 0, 0.3)';
+        btn.style.borderColor = 'rgba(255, 215, 0, 0.6)';
+        ditherUI.style.display = 'block';
+        // Enable dither on the main camera
+        camera.setPostFXProfileSync(PostFXPipeline, 'mac_dither', {
+          strength: parseFloat(document.getElementById('ditherStrength').value),
+          bias: parseFloat(document.getElementById('ditherBias').value),
+          matrixSize: parseInt(document.getElementById('ditherMatrix').value),
+          invert: document.getElementById('ditherInvert').checked
+        });
+      } else {
+        btn.textContent = 'Enable Dither';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        ditherUI.style.display = 'none';
+        // Disable dither on main camera
+        if (camera.postFXPipeline) {
+          const pass = camera.postFXPipeline.getPass('DitherPass');
+          if (pass) pass.enabled = false;
+          camera.postFXEnabled = false;
+        }
+      }
+    }
+
+    function updateDitherParams() {
+      if (!camera.postFXPipeline) return;
+      const pass = camera.postFXPipeline.getPass('DitherPass');
+      if (!pass) return;
+
+      pass.strength = parseFloat(document.getElementById('ditherStrength').value);
+      pass.bias = parseFloat(document.getElementById('ditherBias').value);
+      pass.matrixSize = parseInt(document.getElementById('ditherMatrix').value);
+      pass.invert = document.getElementById('ditherInvert').checked;
+
+      document.getElementById('ditherStrVal').textContent = pass.strength.toFixed(2);
+      document.getElementById('ditherBiasVal').textContent = pass.bias.toFixed(2);
+    }
+
+    // Clear all lights
+    function clearLights() {
+      lights.forEach(light => {
+        scene.remove(light);
+        if (light.target && light.target.isObject3D) {
+          scene.remove(light.target);
+        }
+      });
+      lights = [];
+      lightHelpers = [];
+      selectedLight = null;
+      updatePropertiesPanel();
+      updateSceneTree();
+      
+      // Add back default ambient
+      addLight('ambient');
+    }
+
+    // Clear all objects and lights
+    function clearAll() {
+      clearLights();
+      sceneObjects.forEach(obj => {
+        scene.remove(obj);
+      });
+      sceneObjects = [];
+      selectedObject = null;
+      updateSceneTree();
+    }
+
+    // ──────────────────────────────────
+    // Scene Export / Import (JSON)
+    // ──────────────────────────────────
+    function exportScene() {
+      const data = {
+        version: 1,
+        lights: [],
+        objects: []
+      };
+
+      // Serialize lights
+      lights.forEach(light => {
+        const entry = {
+          type: light.userData.type,
+          name: light.userData.name,
+          enabled: light.enabled !== false,
+          position: { x: light.position.x, y: light.position.y, z: light.position.z },
+          intensity: light.intensity
+        };
+
+        // Color (not all lights store color the same way)
+        if (light.color) {
+          entry.color = light.color.getHex();
+        }
+
+        // Type-specific properties
+        if (light.userData.type === 'spot') {
+          entry.angle = light.angle;
+          entry.penumbra = light.penumbra;
+          entry.distance = light.distance;
+          entry.decay = light.decay;
+          entry.castShadow = !!light.castShadow;
+          if (light.target) {
+            entry.target = {
+              x: light.target.position.x,
+              y: light.target.position.y,
+              z: light.target.position.z
+            };
+          }
+        } else if (light.userData.type === 'point') {
+          entry.distance = light.distance;
+          entry.decay = light.decay;
+          entry.castShadow = !!light.castShadow;
+        } else if (light.userData.type === 'directional') {
+          entry.castShadow = !!light.castShadow;
+          if (light.target) {
+            const tp = light.target.position || light.target;
+            entry.target = { x: tp.x, y: tp.y, z: tp.z };
+          }
+        } else if (light.userData.type === 'hemisphere') {
+          if (light.groundColor) {
+            entry.groundColor = light.groundColor.getHex();
+          }
+        }
+
+        data.lights.push(entry);
+      });
+
+      // Serialize objects
+      sceneObjects.forEach(obj => {
+        const mat = obj.material;
+        const entry = {
+          name: obj.userData.name,
+          geometryType: obj.userData.name.includes('Sphere') ? 'sphere' : 'cube',
+          position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+          rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+          scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
+          castShadow: !!obj.castShadow,
+          receiveShadow: !!obj.receiveShadow,
+          material: {
+            type: mat.type, // 'BasicMaterial', 'LambertMaterial', 'PBRMaterial', 'DebugMaterial'
+            color: mat.color ? mat.color.getHex() : 0x808080,
+            opacity: mat.opacity !== undefined ? mat.opacity : 1,
+            transparent: !!mat.transparent,
+            side: mat.side || 'FrontSide'
+          }
+        };
+
+        // PBR extras
+        if (mat.type === 'PBRMaterial') {
+          entry.material.metallic = mat.metallic !== undefined ? mat.metallic : 0;
+          entry.material.roughness = mat.roughness !== undefined ? mat.roughness : 0.5;
+          entry.material.normalScale = mat.normalScale !== undefined ? mat.normalScale : 1;
+          if (mat.emissive) entry.material.emissive = mat.emissive.getHex();
+          entry.material.emissiveIntensity = mat.emissiveIntensity || 0;
+        }
+
+        // Lambert extras
+        if (mat.type === 'LambertMaterial') {
+          if (mat.emissive) entry.material.emissive = mat.emissive.getHex();
+          entry.material.emissiveIntensity = mat.emissiveIntensity || 0;
+        }
+
+        data.objects.push(entry);
+      });
+
+      // Download as JSON
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bangbang3d-scene.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log(`Scene exported: ${data.lights.length} lights, ${data.objects.length} objects`);
+    }
+
+    function importScene(jsonString) {
+      let data;
+      try {
+        data = JSON.parse(jsonString);
+      } catch (e) {
+        alert('Invalid JSON file: ' + e.message);
+        return;
+      }
+
+      if (!data.lights && !data.objects) {
+        alert('JSON file does not contain a valid scene (no lights or objects found).');
+        return;
+      }
+
+      // Clear existing scene
+      clearAll();
+
+      // Recreate lights
+      if (data.lights) {
+        // Remove the default ambient that clearAll adds
+        if (lights.length === 1 && lights[0].userData.type === 'ambient') {
+          scene.remove(lights[0]);
+          lights = [];
+          lightHelpers = [];
+        }
+
+        data.lights.forEach(entry => {
+          const light = addLight(entry.type);
+          if (!light) return;
+
+          // Restore name
+          light.userData.name = entry.name || light.userData.name;
+
+          // Restore position
+          if (entry.position) {
+            light.position.set(entry.position.x, entry.position.y, entry.position.z);
+          }
+
+          // Restore color
+          if (entry.color !== undefined && light.color) {
+            light.color.setHex(entry.color);
+          }
+
+          // Restore intensity
+          if (entry.intensity !== undefined) {
+            light.intensity = entry.intensity;
+          }
+
+          // Restore enabled
+          light.enabled = entry.enabled !== false;
+
+          // Type-specific properties
+          if (entry.type === 'spot') {
+            if (entry.angle !== undefined) light.angle = entry.angle;
+            if (entry.penumbra !== undefined) light.penumbra = entry.penumbra;
+            if (entry.distance !== undefined) light.distance = entry.distance;
+            if (entry.decay !== undefined) light.decay = entry.decay;
+            if (entry.castShadow) light.castShadow = true;
+            if (entry.target && light.target) {
+              light.target.position.set(entry.target.x, entry.target.y, entry.target.z);
+            }
+          } else if (entry.type === 'point') {
+            if (entry.distance !== undefined) light.distance = entry.distance;
+            if (entry.decay !== undefined) light.decay = entry.decay;
+            if (entry.castShadow) light.castShadow = true;
+          } else if (entry.type === 'directional') {
+            if (entry.castShadow) light.castShadow = true;
+            if (entry.target && light.target) {
+              if (light.target.position) {
+                light.target.position.set(entry.target.x, entry.target.y, entry.target.z);
+              } else {
+                light.target = new Vector3(entry.target.x, entry.target.y, entry.target.z);
+              }
+            }
+          } else if (entry.type === 'hemisphere') {
+            if (entry.groundColor !== undefined && light.groundColor) {
+              light.groundColor.setHex(entry.groundColor);
+            }
+          }
+
+          // Sync helper
+          const helper = lightHelpers.find(h => h.light === light);
+          if (helper) {
+            helper.position.copy(light.position);
+            if (helper.update) helper.update();
+          }
+        });
+      }
+
+      // Recreate objects
+      if (data.objects) {
+        data.objects.forEach(entry => {
+          const geoType = entry.geometryType || (entry.name.includes('Sphere') ? 'sphere' : 'cube');
+          const obj = addObject(geoType);
+          if (!obj) return;
+
+          // Restore name
+          obj.userData.name = entry.name || obj.userData.name;
+
+          // Restore transform
+          if (entry.position) {
+            obj.position.set(entry.position.x, entry.position.y, entry.position.z);
+          }
+          if (entry.rotation) {
+            obj.rotation.set(entry.rotation.x, entry.rotation.y, entry.rotation.z);
+          }
+          if (entry.scale) {
+            obj.scale.set(entry.scale.x, entry.scale.y, entry.scale.z);
+          }
+
+          // Restore shadow flags
+          if (entry.castShadow) obj.castShadow = true;
+          if (entry.receiveShadow) obj.receiveShadow = true;
+
+          // Restore material
+          if (entry.material) {
+            const matDef = entry.material;
+            let matType = 'lambert'; // default
+
+            if (matDef.type === 'BasicMaterial') matType = 'basic';
+            else if (matDef.type === 'PBRMaterial') matType = 'pbr';
+            else if (matDef.type === 'DebugMaterial') matType = 'debug';
+            else if (matDef.type === 'LambertMaterial') matType = 'lambert';
+
+            changeMaterialType(obj, matType);
+
+            // Apply color
+            if (matDef.color !== undefined && obj.material.color) {
+              obj.material.color.setHex(matDef.color);
+              obj.userData.originalColor = matDef.color;
+            }
+
+            // Apply opacity / transparency
+            if (matDef.opacity !== undefined) obj.material.opacity = matDef.opacity;
+            if (matDef.transparent !== undefined) obj.material.transparent = matDef.transparent;
+
+            // PBR properties
+            if (matType === 'pbr') {
+              if (matDef.metallic !== undefined) obj.material.metallic = matDef.metallic;
+              if (matDef.roughness !== undefined) obj.material.roughness = matDef.roughness;
+              if (matDef.normalScale !== undefined) obj.material.normalScale = matDef.normalScale;
+              if (matDef.emissive !== undefined && obj.material.emissive) {
+                obj.material.emissive.setHex(matDef.emissive);
+              }
+              if (matDef.emissiveIntensity !== undefined) {
+                obj.material.emissiveIntensity = matDef.emissiveIntensity;
+              }
+            }
+
+            // Lambert emissive
+            if (matType === 'lambert') {
+              if (matDef.emissive !== undefined && obj.material.emissive) {
+                obj.material.emissive.setHex(matDef.emissive);
+              }
+              if (matDef.emissiveIntensity !== undefined) {
+                obj.material.emissiveIntensity = matDef.emissiveIntensity;
+              }
+            }
+          }
+        });
+      }
+
+      updateSceneTree();
+      drawSchematic();
+      console.log(`Scene imported: ${(data.lights || []).length} lights, ${(data.objects || []).length} objects`);
+    }
+
+    // Select light
+    function selectLight(light) {
+      // Deselect object/camera if selecting light
+      if (light && selectedObject) {
+        selectedObject.material.color.setHex(selectedObject.userData.originalColor);
+        selectedObject = null;
+      }
+      selectedCamera = null;
+      
+      selectedLight = light;
+      updatePropertiesPanel();
+      updateSceneTree();
+      drawSchematic();
+    }
+
+    // Update properties panel
+    function updatePropertiesPanel() {
+      const noSelection = document.getElementById('no-selection');
+      const propsContent = document.getElementById('properties-content');
+      const propsContainer = document.getElementById('props-container');
+      
+      // Check if object is selected
+      if (selectedObject) {
+        noSelection.style.display = 'none';
+        propsContent.style.display = 'block';
+        
+        document.getElementById('light-name').textContent = selectedObject.userData.name;
+        propsContainer.innerHTML = '';
+        
+        // Object color
+        const colorGroup = createColorProperty('Color',
+          selectedObject.material.color,
+          (color) => {
+            selectedObject.material.color.copy(color);
+            selectedObject.userData.originalColor = color.getHex();
+          }
+        );
+        propsContainer.appendChild(colorGroup);
+        
+        // Object scale
+        const scaleX = createRangeProperty('Scale X',
+          selectedObject.scale.x, 0.1, 3, 0.1,
+          (val) => { selectedObject.scale.x = val; }
+        );
+        propsContainer.appendChild(scaleX);
+        
+        const scaleY = createRangeProperty('Scale Y',
+          selectedObject.scale.y, 0.1, 3, 0.1,
+          (val) => { selectedObject.scale.y = val; }
+        );
+        propsContainer.appendChild(scaleY);
+        
+        const scaleZ = createRangeProperty('Scale Z',
+          selectedObject.scale.z, 0.1, 3, 0.1,
+          (val) => { selectedObject.scale.z = val; }
+        );
+        propsContainer.appendChild(scaleZ);
+        
+        // Position display
+        const pos = selectedObject.position;
+        const posDiv = document.createElement('div');
+        posDiv.className = 'prop-group';
+        posDiv.innerHTML = `<div class="position-display">Position: X:${pos.x.toFixed(2)} Y:${pos.y.toFixed(2)} Z:${pos.z.toFixed(2)}</div>`;
+        propsContainer.appendChild(posDiv);
+        
+        // Material type selector (Phase 3)
+        const materialTypeGroup = createSelectProperty('Material Type',
+          getMaterialTypeValue(selectedObject.material),
+          [
+            { value: 'basic', label: 'Basic (Unlit)' },
+            { value: 'lambert', label: 'Lambert (Diffuse)' },
+            { value: 'pbr', label: 'PBR (Physically Based)' },
+            { value: 'debug', label: 'Debug' }
+          ],
+          (value) => { changeMaterialType(selectedObject, value); }
+        );
+        propsContainer.appendChild(materialTypeGroup);
+        
+        // Material-specific properties (Phase 2 & 3)
+        addMaterialProperties(propsContainer, selectedObject.material);
+        
+        // Phase 1: Shadow properties
+        const castShadowGroup = createCheckboxProperty('Cast Shadow',
+          selectedObject.castShadow,
+          (val) => { selectedObject.castShadow = val; }
+        );
+        propsContainer.appendChild(castShadowGroup);
+        
+        const receiveShadowGroup = createCheckboxProperty('Receive Shadow',
+          selectedObject.receiveShadow,
+          (val) => { selectedObject.receiveShadow = val; }
+        );
+        propsContainer.appendChild(receiveShadowGroup);
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete Object';
+        deleteBtn.className = 'danger';
+        deleteBtn.style.marginTop = '10px';
+        deleteBtn.addEventListener('click', () => {
+          if (confirm('Delete selected object?')) {
+            deleteObject();
+          }
+        });
+        propsContainer.appendChild(deleteBtn);
+        
+        return;
+      }
+
+      // Check if camera is selected
+      if (selectedCamera) {
+        noSelection.style.display = 'none';
+        propsContent.style.display = 'block';
+
+        const camName = selectedCamera.userData.name || (selectedCamera === camera ? 'Main Camera' : selectedCamera.type);
+        document.getElementById('light-name').textContent = camName;
+        propsContainer.innerHTML = '';
+
+        if (selectedCamera.isPerspectiveCamera) {
+          // FOV
+          propsContainer.appendChild(createRangeProperty('FOV', selectedCamera.fov, 10, 120, 1, (v) => {
+            selectedCamera.fov = v;
+            selectedCamera.updateProjectionMatrix();
+          }));
+          // Near
+          propsContainer.appendChild(createRangeProperty('Near', selectedCamera.near, 0.01, 10, 0.01, (v) => {
+            selectedCamera.near = v;
+            selectedCamera.updateProjectionMatrix();
+          }));
+          // Far
+          propsContainer.appendChild(createRangeProperty('Far', selectedCamera.far, 10, 2000, 10, (v) => {
+            selectedCamera.far = v;
+            selectedCamera.updateProjectionMatrix();
+          }));
+        }
+
+        // Position
+        propsContainer.appendChild(createRangeProperty('Pos X', selectedCamera.position.x, -30, 30, 0.1, (v) => { selectedCamera.position.x = v; }));
+        propsContainer.appendChild(createRangeProperty('Pos Y', selectedCamera.position.y, -30, 30, 0.1, (v) => { selectedCamera.position.y = v; }));
+        propsContainer.appendChild(createRangeProperty('Pos Z', selectedCamera.position.z, -30, 30, 0.1, (v) => { selectedCamera.position.z = v; }));
+
+        // PostFX
+        const hasFX = selectedCamera.postFXEnabled && selectedCamera.postFXPipeline;
+        propsContainer.appendChild(createCheckboxProperty('Dither Enabled', !!hasFX, (v) => {
+          if (v) {
+            selectedCamera.setPostFXProfileSync(PostFXPipeline, 'mac_dither', { strength: 1.0, matrixSize: 8 });
+          } else {
+            if (selectedCamera.postFXPipeline) {
+              selectedCamera.postFXEnabled = false;
+            }
+          }
+          updateSceneTree();
+        }));
+
+        if (hasFX) {
+          const ditherPass = selectedCamera.postFXPipeline.getPass('DitherPass');
+          if (ditherPass) {
+            propsContainer.appendChild(createRangeProperty('Dither Strength', ditherPass.strength, 0, 1, 0.01, (v) => {
+              ditherPass.strength = v;
+            }));
+            propsContainer.appendChild(createRangeProperty('Threshold Bias', ditherPass.bias, -0.5, 0.5, 0.01, (v) => {
+              ditherPass.bias = v;
+            }));
+            propsContainer.appendChild(createCheckboxProperty('Invert', ditherPass.invert, (v) => {
+              ditherPass.invert = v;
+            }));
+          }
+        }
+
+        // Set Active Camera button
+        if (selectedCamera !== camera) {
+          const setActiveBtn = document.createElement('button');
+          setActiveBtn.textContent = (scene.activeCamera === selectedCamera) ? '★ Active Camera' : 'Set Active';
+          setActiveBtn.style.marginTop = '8px';
+          setActiveBtn.onclick = () => {
+            setActiveCamera(selectedCamera);
+            updateSceneTree();
+            updatePropertiesPanel();
+          };
+          propsContainer.appendChild(setActiveBtn);
+
+          // Align main camera to this camera
+          const alignBtn = document.createElement('button');
+          alignBtn.textContent = 'Align Main Camera Here';
+          alignBtn.style.marginTop = '4px';
+          alignBtn.onclick = () => {
+            camera.position.copy(selectedCamera.position);
+            camera.quaternion.copy(selectedCamera.quaternion);
+            camera.updateProjectionMatrix();
+            if (controls) controls.target.set(0, 0, 0);
+          };
+          propsContainer.appendChild(alignBtn);
+
+          // Delete camera button
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = 'Delete Camera';
+          deleteBtn.className = 'danger';
+          deleteBtn.style.marginTop = '8px';
+          deleteBtn.onclick = () => { removeSelectedCamera(); };
+          propsContainer.appendChild(deleteBtn);
+        }
+
+        return;
+      }
+      
+      // Check if light is selected
+      if (!selectedLight) {
+        noSelection.style.display = 'block';
+        propsContent.style.display = 'none';
+        return;
+      }
+      
+      noSelection.style.display = 'none';
+      propsContent.style.display = 'block';
+      
+      document.getElementById('light-name').textContent = selectedLight.userData.name;
+      
+      // Clear existing properties
+      propsContainer.innerHTML = '';
+      
+      // Build properties based on light type
+      const type = selectedLight.userData.type;
+      
+      // Color property (all lights except ambient)
+      if (type !== 'hemisphere') {
+        const colorGroup = createColorProperty('Color', 
+          selectedLight.color,
+          (color) => { selectedLight.color.copy(color); }
+        );
+        propsContainer.appendChild(colorGroup);
+      }
+      
+      // Hemisphere sky/ground colors
+      if (type === 'hemisphere') {
+        const skyGroup = createColorProperty('Sky Color',
+          selectedLight.color,
+          (color) => { selectedLight.color.copy(color); }
+        );
+        propsContainer.appendChild(skyGroup);
+        
+        const groundGroup = createColorProperty('Ground Color',
+          selectedLight.groundColor,
+          (color) => { selectedLight.groundColor.copy(color); }
+        );
+        propsContainer.appendChild(groundGroup);
+      }
+      
+      // Intensity
+      if (type !== 'ambient') {
+        const intensityGroup = createRangeProperty('Intensity',
+          selectedLight.intensity, 0, 3, 0.1,
+          (val) => { selectedLight.intensity = val; }
+        );
+        propsContainer.appendChild(intensityGroup);
+      } else {
+        const intensityGroup = createRangeProperty('Intensity',
+          selectedLight.intensity, 0, 1, 0.05,
+          (val) => { selectedLight.intensity = val; }
+        );
+        propsContainer.appendChild(intensityGroup);
+      }
+      
+      // Distance (point and spot)
+      if (type === 'point' || type === 'spot') {
+        const distGroup = createRangeProperty('Distance',
+          selectedLight.distance, 0, 20, 0.5,
+          (val) => { selectedLight.distance = val; }
+        );
+        propsContainer.appendChild(distGroup);
+        
+        const decayGroup = createRangeProperty('Decay',
+          selectedLight.decay, 0, 3, 0.1,
+          (val) => { selectedLight.decay = val; }
+        );
+        propsContainer.appendChild(decayGroup);
+      }
+      
+      // Angle and penumbra (spot)
+      if (type === 'spot') {
+        const angleGroup = createRangeProperty('Angle',
+          selectedLight.angle, 0, Math.PI / 2, 0.01,
+          (val) => { selectedLight.angle = val; }
+        );
+        propsContainer.appendChild(angleGroup);
+        
+        const penumbraGroup = createRangeProperty('Penumbra',
+          selectedLight.penumbra, 0, 1, 0.05,
+          (val) => { selectedLight.penumbra = val; }
+        );
+        propsContainer.appendChild(penumbraGroup);
+      }
+      
+      // Phase 1: Cast Shadow checkbox (directional and spot lights only)
+      if (type === 'directional' || type === 'spot') {
+        const castShadowGroup = createCheckboxProperty('Cast Shadow',
+          selectedLight.castShadow,
+          (val) => { selectedLight.castShadow = val; }
+        );
+        propsContainer.appendChild(castShadowGroup);
+      }
+      
+      updatePositionDisplay();
+    }
+
+    // Create color property control
+    function createColorProperty(label, color, onChange) {
+      const group = document.createElement('div');
+      group.className = 'prop-group';
+      
+      const labelEl = document.createElement('label');
+      labelEl.className = 'prop-label';
+      labelEl.textContent = label;
+      
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = '#' + color.getHexString();
+      input.addEventListener('input', (e) => {
+        const hex = e.target.value;
+        const r = parseInt(hex.substr(1, 2), 16) / 255;
+        const g = parseInt(hex.substr(3, 2), 16) / 255;
+        const b = parseInt(hex.substr(5, 2), 16) / 255;
+        onChange(new Color(r, g, b));
+      });
+      
+      group.appendChild(labelEl);
+      group.appendChild(input);
+      return group;
+    }
+
+    // Create range property control
+    function createRangeProperty(label, value, min, max, step, onChange) {
+      const group = document.createElement('div');
+      group.className = 'prop-group';
+      
+      const labelEl = document.createElement('label');
+      labelEl.className = 'prop-label';
+      labelEl.textContent = label;
+      
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = min;
+      input.max = max;
+      input.step = step;
+      input.value = value;
+      
+      const valueDisplay = document.createElement('div');
+      valueDisplay.className = 'range-value';
+      valueDisplay.textContent = value.toFixed(2);
+      
+      input.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        valueDisplay.textContent = val.toFixed(2);
+        onChange(val);
+        drawSchematic(); // Update schematic when property changes
+      });
+      
+      group.appendChild(labelEl);
+      group.appendChild(input);
+      group.appendChild(valueDisplay);
+      return group;
+    }
+
+    // Create checkbox property control (Phase 1: Shadow controls)
+    function createCheckboxProperty(label, value, onChange) {
+      const group = document.createElement('div');
+      group.className = 'prop-group';
+      
+      const labelEl = document.createElement('label');
+      labelEl.className = 'prop-label';
+      labelEl.style.display = 'flex';
+      labelEl.style.alignItems = 'center';
+      labelEl.style.gap = '8px';
+      labelEl.style.cursor = 'pointer';
+      
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = value;
+      input.style.cursor = 'pointer';
+      
+      const text = document.createElement('span');
+      text.textContent = label;
+      
+      input.addEventListener('change', (e) => {
+        onChange(e.target.checked);
+      });
+      
+      labelEl.appendChild(input);
+      labelEl.appendChild(text);
+      group.appendChild(labelEl);
+      return group;
+    }
+
+    // Create select/dropdown property control (Phase 3)
+    function createSelectProperty(label, value, options, onChange) {
+      const group = document.createElement('div');
+      group.className = 'prop-group';
+      
+      const labelEl = document.createElement('label');
+      labelEl.className = 'prop-label';
+      labelEl.textContent = label;
+      
+      const select = document.createElement('select');
+      select.style.width = '100%';
+      select.style.padding = '6px';
+      select.style.background = 'rgba(22, 27, 34, 0.8)';
+      select.style.color = '#c9d1d9';
+      select.style.border = '1px solid rgba(48, 54, 61, 0.8)';
+      select.style.borderRadius = '4px';
+      select.style.cursor = 'pointer';
+      
+      options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        option.selected = opt.value === value;
+        select.appendChild(option);
+      });
+      
+      select.addEventListener('change', (e) => {
+        onChange(e.target.value);
+      });
+      
+      group.appendChild(labelEl);
+      group.appendChild(select);
+      return group;
+    }
+    
+    // Get material type as string value (Phase 3)
+    function getMaterialTypeValue(material) {
+      if (!material || !material.type) return 'lambert';
+      
+      switch(material.type) {
+        case 'BasicMaterial': return 'basic';
+        case 'LambertMaterial': return 'lambert';
+        case 'PBRMaterial': return 'pbr';
+        case 'DebugMaterial': return 'debug';
+        default: return 'lambert';
+      }
+    }
+    
+    // Change material type (Phase 3)
+    function changeMaterialType(object, typeValue) {
+      if (!object || !object.material) return;
+      
+      const oldMaterial = object.material;
+      let newMaterial;
+      
+      switch(typeValue) {
+        case 'basic':
+          newMaterial = new BasicMaterial({ 
+            color: oldMaterial.color ? oldMaterial.color.getHex() : 0x808080
+          });
+          break;
+        case 'lambert':
+          newMaterial = new LambertMaterial({ 
+            color: oldMaterial.color ? oldMaterial.color.getHex() : 0x808080
+          });
+          break;
+        case 'pbr':
+          newMaterial = new PBRMaterial({ 
+            color: oldMaterial.color ? oldMaterial.color.getHex() : 0x808080
+          });
+          break;
+        case 'debug':
+          newMaterial = new DebugMaterial({ 
+            mode: 'normals'
+          });
+          break;
+        default:
+          return;
+      }
+      
+      // Copy common properties
+      newMaterial.transparent = oldMaterial.transparent;
+      newMaterial.opacity = oldMaterial.opacity;
+      newMaterial.side = oldMaterial.side;
+      newMaterial.visible = oldMaterial.visible;
+      
+      // Copy map if compatible
+      if (oldMaterial.map && (typeValue === 'basic' || typeValue === 'lambert' || typeValue === 'pbr')) {
+        newMaterial.map = oldMaterial.map;
+      }
+      
+      object.material = newMaterial;
+      object.userData.originalColor = newMaterial.color ? newMaterial.color.getHex() : 0x808080;
+      
+      // Refresh properties panel
+      updatePropertiesPanel();
+    }
+    
+    // Add material-specific properties (Phase 2 & 3)
+    function addMaterialProperties(container, material) {
+      if (!material) return;
+      
+      const type = material.type;
+      
+      // Texture map selector (Phase 2) - for Basic, Lambert, and PBR
+      if (type === 'BasicMaterial' || type === 'LambertMaterial' || type === 'PBRMaterial') {
+        const currentTexture = material.map?.procedural?.generator || 'none';
+        const textureGroup = createSelectProperty('Texture Map',
+          currentTexture,
+          [
+            { value: 'none', label: 'None' },
+            { value: 'checker', label: 'Checker' },
+            { value: 'uvtest', label: 'UV Test' },
+            { value: 'grid', label: 'Grid' },
+            { value: 'wood', label: 'Wood' },
+            { value: 'brick', label: 'Brick' },
+            { value: 'noise', label: 'Noise' },
+            { value: 'gradient', label: 'Gradient' }
+          ],
+          (value) => {
+            if (value === 'none') {
+              material.map = null;
+            } else {
+              material.map = createProceduralTexture(value);
+            }
+          }
+        );
+        container.appendChild(textureGroup);
+      }
+      
+      // Lambert-specific properties
+      if (type === 'LambertMaterial') {
+        const emissiveColor = createColorProperty('Emissive',
+          material.emissive,
+          (color) => { material.emissive.copy(color); }
+        );
+        container.appendChild(emissiveColor);
+        
+        const emissiveIntensity = createRangeProperty('Emissive Intensity',
+          material.emissiveIntensity, 0, 2, 0.1,
+          (val) => { material.emissiveIntensity = val; }
+        );
+        container.appendChild(emissiveIntensity);
+      }
+      
+      // PBR-specific properties (Phase 3)
+      if (type === 'PBRMaterial') {
+        const metallic = createRangeProperty('Metallic',
+          material.metallic, 0, 1, 0.01,
+          (val) => { material.metallic = val; }
+        );
+        container.appendChild(metallic);
+        
+        const roughness = createRangeProperty('Roughness',
+          material.roughness, 0, 1, 0.01,
+          (val) => { material.roughness = val; }
+        );
+        container.appendChild(roughness);
+        
+        const normalScale = createRangeProperty('Normal Scale',
+          material.normalScale, 0, 2, 0.1,
+          (val) => { material.normalScale = val; }
+        );
+        container.appendChild(normalScale);
+        
+        const aoIntensity = createRangeProperty('AO Intensity',
+          material.aoMapIntensity, 0, 2, 0.1,
+          (val) => { material.aoMapIntensity = val; }
+        );
+        container.appendChild(aoIntensity);
+        
+        const emissiveColor = createColorProperty('Emissive',
+          material.emissive,
+          (color) => { material.emissive.copy(color); }
+        );
+        container.appendChild(emissiveColor);
+        
+        const emissiveIntensity = createRangeProperty('Emissive Intensity',
+          material.emissiveIntensity, 0, 2, 0.1,
+          (val) => { material.emissiveIntensity = val; }
+        );
+        container.appendChild(emissiveIntensity);
+
+        const envMapInt = createRangeProperty('Env Map Intensity',
+          material.envMapIntensity !== undefined ? material.envMapIntensity : 1.0, 0, 3, 0.1,
+          (val) => { material.envMapIntensity = val; }
+        );
+        container.appendChild(envMapInt);
+      }
+      
+      // Debug material mode selector
+      if (type === 'DebugMaterial') {
+        const debugMode = createSelectProperty('Debug Mode',
+          material.mode || 'normals',
+          [
+            { value: 'normals', label: 'Normals' },
+            { value: 'uvs', label: 'UVs' },
+            { value: 'depth', label: 'Depth' },
+            { value: 'worldPosition', label: 'World Position' }
+          ],
+          (value) => { material.mode = value; }
+        );
+        container.appendChild(debugMode);
+      }
+    }
+    
+    // Create procedural texture (Phase 2)
+    function createProceduralTexture(type) {
+      switch(type) {
+        case 'checker':
+          return textureLoader.createCheckerTexture(256, 8);
+        case 'uvtest':
+          return textureLoader.createUVTestTexture(256);
+        case 'grid':
+          return textureLoader.createGridTexture(256, 32, 2);
+        case 'wood':
+          return textureLoader.createWoodTexture(512);
+        case 'brick':
+          return textureLoader.createBrickTexture(512);
+        case 'noise':
+          return textureLoader.createNoiseTexture(256, 10, 12345);
+        case 'gradient':
+          return textureLoader.createGradientTexture(256, 'linear', 
+            {r: 0, g: 0, b: 0}, {r: 1, g: 1, b: 1});
+        default:
+          return null;
+      }
+    }
+
+    // Apply material preset to selected object (Phase 3)
+    function applyMaterialPreset(presetName) {
+      if (!selectedObject) {
+        alert('Please select an object first');
+        return;
+      }
+      
+      let material;
+      
+      switch(presetName) {
+        case 'gold':
+          material = new PBRMaterial({
+            color: new Color(1.0, 0.766, 0.336),
+            metallic: 1.0,
+            roughness: 0.2
+          });
+          break;
+        case 'plastic':
+          material = new PBRMaterial({
+            color: new Color(0.8, 0.2, 0.2),
+            metallic: 0.0,
+            roughness: 0.3
+          });
+          break;
+        case 'wood':
+          material = new PBRMaterial({
+            color: new Color(0.6, 0.4, 0.2),
+            metallic: 0.0,
+            roughness: 0.7,
+            map: textureLoader.createWoodTexture(512)
+          });
+          break;
+        case 'metal':
+          material = new PBRMaterial({
+            color: new Color(0.913, 0.921, 0.925),
+            metallic: 1.0,
+            roughness: 0.5
+          });
+          break;
+        default:
+          return;
+      }
+      
+      // Apply to selected object
+      selectedObject.material = material;
+      selectedObject.userData.originalColor = material.color.getHex();
+      
+      // Update properties panel to show new material
+      updatePropertiesPanel();
+    }
+
+    // Update position display
+    function updatePositionDisplay() {
+      if (selectedLight) {
+        const pos = selectedLight.position;
+        document.getElementById('light-pos').textContent = 
+          `X:${pos.x.toFixed(2)} Y:${pos.y.toFixed(2)} Z:${pos.z.toFixed(2)}`;
+      }
+    }
+
+    // Draw schematic visualization
+    function drawSchematic() {
+      const canvas = document.getElementById('schematic-canvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      // Clear canvas
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, w, h);
+      
+      if (!selectedLight) return;
+      
+      const type = selectedLight.userData.type;
+      const centerX = w / 2;
+      const centerY = h / 2;
+      
+      // Draw based on light type
+      ctx.strokeStyle = '#58a6ff';
+      ctx.fillStyle = 'rgba(88, 166, 255, 0.2)';
+      ctx.lineWidth = 2;
+      
+      if (type === 'point') {
+        // Draw concentric circles for point light
+        const maxRadius = 80;
+        const distance = selectedLight.distance || 10;
+        const radius = Math.min((distance / 20) * maxRadius, maxRadius);
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Center point
+        ctx.fillStyle = '#58a6ff';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+      } else if (type === 'spot') {
+        // Draw cone for spotlight
+        const angle = selectedLight.angle || Math.PI / 6;
+        const distance = selectedLight.distance || 15;
+        const radius = Math.tan(angle) * (distance / 20) * 80;
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - 40);
+        ctx.lineTo(centerX - radius, centerY + 60);
+        ctx.lineTo(centerX + radius, centerY + 60);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        // Light source
+        ctx.fillStyle = '#58a6ff';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY - 40, 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Direction arrow
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - 40);
+        ctx.lineTo(centerX, centerY + 40);
+        ctx.stroke();
+        
+        // Arrowhead
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY + 40);
+        ctx.lineTo(centerX - 5, centerY + 30);
+        ctx.moveTo(centerX, centerY + 40);
+        ctx.lineTo(centerX + 5, centerY + 30);
+        ctx.stroke();
+        
+      } else if (type === 'directional') {
+        // Draw parallel rays
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        
+        for (let i = -2; i <= 2; i++) {
+          const x = centerX + i * 25;
+          ctx.beginPath();
+          ctx.moveTo(x, 40);
+          ctx.lineTo(x, 160);
+          ctx.stroke();
+          
+          // Arrowheads
+          ctx.beginPath();
+          ctx.moveTo(x, 160);
+          ctx.lineTo(x - 5, 150);
+          ctx.moveTo(x, 160);
+          ctx.lineTo(x + 5, 150);
+          ctx.stroke();
+        }
+        
+      } else if (type === 'hemisphere') {
+        // Draw hemisphere
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 70, 0, Math.PI, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        // Sky gradient
+        const grad = ctx.createLinearGradient(centerX, centerY - 70, centerX, centerY);
+        grad.addColorStop(0, 'rgba(135, 206, 235, 0.5)');
+        grad.addColorStop(1, 'rgba(139, 69, 19, 0.5)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+        
+        // Horizon line
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(centerX - 70, centerY);
+        ctx.lineTo(centerX + 70, centerY);
+        ctx.stroke();
+        
+      } else if (type === 'ambient') {
+        // Draw ambient symbol
+        ctx.strokeStyle = '#58a6ff';
+        ctx.lineWidth = 2;
+        
+        // Sun-like rays
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const x1 = centerX + Math.cos(angle) * 30;
+          const y1 = centerY + Math.sin(angle) * 30;
+          const x2 = centerX + Math.cos(angle) * 60;
+          const y2 = centerY + Math.sin(angle) * 60;
+          
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+        
+        // Center circle
+        ctx.fillStyle = 'rgba(88, 166, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      
+      // Draw type label
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(type.toUpperCase(), centerX, h - 10);
+    }
+
+    // Get normalized mouse coordinates
+    function getNormalizedMouseCoords(event) {
+      const canvas = document.getElementById('canvas');
+      const rect = canvas.getBoundingClientRect();
+      return new Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+    }
+
+    // Object dragging state
+    let selectedObject = null;
+    let isDraggingObject = false;
+    let mouseDownOnObject = false;
+    let dragStartObjectPos = new Vector3();
+
+    // Handle mouse down
+    function onMouseDown(event) {
+      if (event.button !== 0) return;
+      
+      const coords = getNormalizedMouseCoords(event);
+      raycaster.setFromCamera(coords, camera);
+      
+      // Check for light helper intersection first
+      const lightIntersects = raycaster.intersectObjects(lightHelpers, true);
+      
+      if (lightIntersects.length > 0) {
+        // Find the light associated with this helper
+        let clickedHelper = lightIntersects[0].object;
+        // Traverse up to find the helper root
+        while (clickedHelper.parent && !clickedHelper.light) {
+          clickedHelper = clickedHelper.parent;
+        }
+        
+        if (clickedHelper.light) {
+          const clickedLight = clickedHelper.light;
+          
+          if (clickedLight === selectedLight) {
+            // Starting drag
+            mouseDownOnLight = true;
+            isDraggingLight = false;
+            isRotating = false;
+            dragStartPos.copy(coords);
+            dragStartLightPos.copy(selectedLight.position);
+            if (selectedLight.rotation) {
+              dragStartRotation.x = selectedLight.rotation.x;
+              dragStartRotation.y = selectedLight.rotation.y;
+              dragStartRotation.z = selectedLight.rotation.z;
+            } else {
+              dragStartRotation.x = 0;
+              dragStartRotation.y = 0;
+              dragStartRotation.z = 0;
+            }
+            
+            controls.enabled = false;
+            document.getElementById('canvas').classList.add('dragging');
+            event.preventDefault();
+          } else {
+            // Select different light
+            selectLight(clickedLight);
+            selectedObject = null; // Deselect object
+          }
+        }
+      } else {
+        // Check for scene object intersection
+        const objectIntersects = raycaster.intersectObjects(sceneObjects, false);
+        
+        if (objectIntersects.length > 0) {
+          const clickedObject = objectIntersects[0].object;
+          
+          if (clickedObject === selectedObject) {
+            // Starting drag on selected object
+            mouseDownOnObject = true;
+            isDraggingObject = false;
+            isRotating = false;
+            dragStartPos.copy(coords);
+            dragStartObjectPos.copy(selectedObject.position);
+            if (selectedObject.rotation) {
+              dragStartRotation.x = selectedObject.rotation.x;
+              dragStartRotation.y = selectedObject.rotation.y;
+              dragStartRotation.z = selectedObject.rotation.z;
+            } else {
+              dragStartRotation.x = 0;
+              dragStartRotation.y = 0;
+              dragStartRotation.z = 0;
+            }
+            
+            controls.enabled = false;
+            document.getElementById('canvas').classList.add('dragging');
+            event.preventDefault();
+          } else {
+            // Select object, deselect light
+            selectObject(clickedObject);
+            selectLight(null);
+          }
+        } else {
+          // Deselect everything
+          selectLight(null);
+          selectObject(null);
+        }
+      }
+    }
+
+    // Handle mouse move
+    function onMouseMove(event) {
+      // Handle light dragging/rotation
+      if (mouseDownOnLight && selectedLight) {
+        const coords = getNormalizedMouseCoords(event);
+        const deltaX = coords.x - dragStartPos.x;
+        const deltaY = coords.y - dragStartPos.y;
+        
+        if (event.shiftKey) {
+          // Rotation mode
+          isDraggingLight = true;
+          isRotating = true;
+          
+          // Rotate based on mouse delta
+          if (!selectedLight.rotation) {
+            selectedLight.rotation = { x: 0, y: 0, z: 0 };
+          }
+          
+          const rotSpeed = 3.0;
+          selectedLight.rotation.y = dragStartRotation.y + deltaX * rotSpeed;
+          selectedLight.rotation.x = dragStartRotation.x + deltaY * rotSpeed;
+          
+          // Update spotlight target if applicable
+          if (selectedLight.userData.type === 'spot' && selectedLight.target) {
+            const direction = new Vector3(
+              Math.sin(selectedLight.rotation.y),
+              -Math.sin(selectedLight.rotation.x),
+              Math.cos(selectedLight.rotation.y)
+            );
+            const targetDistance = 5;
+            selectedLight.target.position.copy(selectedLight.position);
+            selectedLight.target.position.add(direction.multiplyScalar(targetDistance));
+          }
+          
+          // Update directional light target
+          if (selectedLight.userData.type === 'directional') {
+            const direction = new Vector3(
+              Math.sin(selectedLight.rotation.y),
+              -Math.sin(selectedLight.rotation.x),
+              Math.cos(selectedLight.rotation.y)
+            );
+            selectedLight.target = new Vector3();
+            selectedLight.target.copy(selectedLight.position);
+            selectedLight.target.add(direction.multiplyScalar(5));
+          }
+        } else {
+          // Translation mode
+          isDraggingLight = true;
+          isRotating = false;
+          
+          // Convert screen space to world space
+          const distance = camera.position.distanceTo(selectedLight.position);
+          const fov = camera.fov * Math.PI / 180;
+          const scale = 2 * Math.tan(fov / 2) * distance;
+          
+          const worldDeltaX = deltaX * scale;
+          const worldDeltaY = deltaY * scale;
+          
+          // Get camera's right and up vectors
+          const cameraMatrix = camera.matrixWorld;
+          const right = new Vector3(cameraMatrix.elements[0], cameraMatrix.elements[1], cameraMatrix.elements[2]);
+          const up = new Vector3(cameraMatrix.elements[4], cameraMatrix.elements[5], cameraMatrix.elements[6]);
+          
+          if (event.ctrlKey) {
+            // Move along Z (depth)
+            const forward = new Vector3(cameraMatrix.elements[8], cameraMatrix.elements[9], cameraMatrix.elements[10]);
+            const moveZ = forward.multiplyScalar(worldDeltaY);
+            
+            selectedLight.position.copy(dragStartLightPos);
+            selectedLight.position.add(moveZ);
+          } else {
+            // Move in XY plane
+            const moveX = right.multiplyScalar(worldDeltaX);
+            const moveY = up.multiplyScalar(worldDeltaY);
+            
+            selectedLight.position.copy(dragStartLightPos);
+            selectedLight.position.add(moveX);
+            selectedLight.position.add(moveY);
+          }
+        }
+        
+        updatePositionDisplay();
+        drawSchematic();
+        
+        // Update helper if exists
+        const helper = lightHelpers.find(h => h.light === selectedLight);
+        if (helper && helper.update) {
+          helper.position.copy(selectedLight.position);
+          helper.update();
+        }
+      }
+      // Handle object dragging/rotation
+      else if (mouseDownOnObject && selectedObject) {
+        const coords = getNormalizedMouseCoords(event);
+        const deltaX = coords.x - dragStartPos.x;
+        const deltaY = coords.y - dragStartPos.y;
+        
+        if (event.shiftKey) {
+          // Rotation mode
+          isDraggingObject = true;
+          isRotating = true;
+          
+          if (!selectedObject.rotation) {
+            selectedObject.rotation = { x: 0, y: 0, z: 0 };
+          }
+          
+          const rotSpeed = 3.0;
+          selectedObject.rotation.y = dragStartRotation.y + deltaX * rotSpeed;
+          selectedObject.rotation.x = dragStartRotation.x + deltaY * rotSpeed;
+        } else {
+          // Translation mode
+          isDraggingObject = true;
+          isRotating = false;
+          
+          // Convert screen space to world space
+          const distance = camera.position.distanceTo(selectedObject.position);
+          const fov = camera.fov * Math.PI / 180;
+          const scale = 2 * Math.tan(fov / 2) * distance;
+          
+          const worldDeltaX = deltaX * scale;
+          const worldDeltaY = deltaY * scale;
+          
+          // Get camera's right and up vectors
+          const cameraMatrix = camera.matrixWorld;
+          const right = new Vector3(cameraMatrix.elements[0], cameraMatrix.elements[1], cameraMatrix.elements[2]);
+          const up = new Vector3(cameraMatrix.elements[4], cameraMatrix.elements[5], cameraMatrix.elements[6]);
+          
+          if (event.ctrlKey) {
+            // Move along Z (depth)
+            const forward = new Vector3(cameraMatrix.elements[8], cameraMatrix.elements[9], cameraMatrix.elements[10]);
+            const moveZ = forward.multiplyScalar(worldDeltaY);
+            
+            selectedObject.position.copy(dragStartObjectPos);
+            selectedObject.position.add(moveZ);
+          } else {
+            // Move in XY plane
+            const moveX = right.multiplyScalar(worldDeltaX);
+            const moveY = up.multiplyScalar(worldDeltaY);
+            
+            selectedObject.position.copy(dragStartObjectPos);
+            selectedObject.position.add(moveX);
+            selectedObject.position.add(moveY);
+          }
+        }
+      }
+    }
+
+    // Handle mouse up
+    function onMouseUp(event) {
+      if (mouseDownOnLight || mouseDownOnObject) {
+        controls.enabled = true;
+        document.getElementById('canvas').classList.remove('dragging');
+      }
+      
+      mouseDownOnLight = false;
+      isDraggingLight = false;
+      mouseDownOnObject = false;
+      isDraggingObject = false;
+      isRotating = false;
+    }
+
+    // Select object
+    function selectObject(object) {
+      // Deselect previous object
+      if (selectedObject) {
+        selectedObject.material.color.setHex(selectedObject.userData.originalColor);
+      }
+      
+      // Deselect light/camera if selecting object
+      if (object) {
+        selectedLight = null;
+        selectedCamera = null;
+      }
+      
+      selectedObject = object;
+      
+      if (selectedObject) {
+        // Store original color if not already stored
+        if (!selectedObject.userData.originalColor) {
+          selectedObject.userData.originalColor = selectedObject.material.color.getHex();
+        }
+        
+        // Highlight selected object
+        const origColor = selectedObject.userData.originalColor;
+        const r = ((origColor >> 16) & 0xff) / 255;
+        const g = ((origColor >> 8) & 0xff) / 255;
+        const b = (origColor & 0xff) / 255;
+        
+        // Mix with white for highlight
+        const highlightFactor = 0.5;
+        const hr = r + (1 - r) * highlightFactor;
+        const hg = g + (1 - g) * highlightFactor;
+        const hb = b + (1 - b) * highlightFactor;
+        
+        selectedObject.material.color.setRGB(hr, hg, hb);
+      }
+      
+      updatePropertiesPanel();
+      updateSceneTree();
+    }
+    
+    // Delete object
+    function deleteObject() {
+      if (!selectedObject) return;
+      
+      scene.remove(selectedObject);
+      const objIndex = sceneObjects.indexOf(selectedObject);
+      if (objIndex > -1) {
+        sceneObjects.splice(objIndex, 1);
+      }
+      
+      selectedObject = null;
+      updatePropertiesPanel();
+      updateSceneTree();
+    }
+    
+    // Update scene tree
+    function updateSceneTree() {
+      const lightsList = document.getElementById('lights-list');
+      const objectsList = document.getElementById('objects-list');
+      
+      // Clear lists
+      lightsList.innerHTML = '';
+      objectsList.innerHTML = '';
+      
+      // Add lights
+      lights.forEach((light, idx) => {
+        const item = document.createElement('div');
+        item.className = 'tree-item';
+        if (light === selectedLight) {
+          item.classList.add('selected');
+        }
+        
+        let icon = '💡';
+        if (light.userData.type === 'point') icon = '⚪';
+        else if (light.userData.type === 'spot') icon = '🔦';
+        else if (light.userData.type === 'directional') icon = '☀️';
+        else if (light.userData.type === 'hemisphere') icon = '🌗';
+        else if (light.userData.type === 'ambient') icon = '🌟';
+        
+        // Create enable/disable toggle button
+        const toggle = document.createElement('span');
+        toggle.className = 'light-toggle';
+        toggle.textContent = light.enabled !== false ? '✔' : '✖'; // ✓ or ✖
+        if (light.enabled === false) {
+          toggle.classList.add('disabled');
+        }
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          light.enabled = !light.enabled;
+          updateSceneTree();
+        });
+        
+        // Create visibility toggle button (eye icon)
+        const visibilityToggle = document.createElement('span');
+        visibilityToggle.className = 'visibility-toggle';
+        
+        // Find the helper for this light
+        const helper = lightHelpers.find(h => h.light === light);
+        const isVisible = helper ? helper.visible !== false : true;
+        
+        visibilityToggle.textContent = isVisible ? '👁' : '⊘'; // Eye or crossed circle
+        if (!isVisible) {
+          visibilityToggle.classList.add('hidden');
+        }
+        
+        // Only add visibility toggle for lights that have helpers (not ambient)
+        if (helper) {
+          visibilityToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            helper.visible = !helper.visible;
+            updateSceneTree();
+          });
+        }
+        
+        const label = document.createElement('span');
+        label.innerHTML = `<span class="tree-item-icon">${icon}</span>${light.userData.name}`;
+        
+        item.appendChild(toggle);
+        if (helper) {
+          item.appendChild(visibilityToggle);
+        }
+        item.appendChild(label);
+        
+        item.addEventListener('click', () => {
+          selectLight(light);
+        });
+        lightsList.appendChild(item);
+      });
+      
+      // Add objects
+      sceneObjects.forEach((obj, idx) => {
+        const item = document.createElement('div');
+        item.className = 'tree-item';
+        if (obj === selectedObject) {
+          item.classList.add('selected');
+        }
+        
+        const icon = obj.userData.name.includes('Sphere') ? '🔵' : '🟦';
+        
+        item.innerHTML = `<span class="tree-item-icon">${icon}</span>${obj.userData.name}`;
+        item.addEventListener('click', () => {
+          selectObject(obj);
+        });
+        objectsList.appendChild(item);
+      });
+
+      // Add cameras
+      const camerasList = document.getElementById('cameras-list');
+      if (camerasList) {
+        camerasList.innerHTML = '';
+
+        // Main camera
+        const mainItem = document.createElement('div');
+        mainItem.className = 'tree-item';
+        if (camera === selectedCamera) mainItem.classList.add('selected');
+        const isActive = (!scene.activeCamera || scene.activeCamera === camera);
+        mainItem.innerHTML = `<span class="tree-item-icon">📷</span>Main Camera${isActive ? ' ★' : ''}`;
+        mainItem.addEventListener('click', () => { selectCamera(camera); });
+        camerasList.appendChild(mainItem);
+
+        // Scene cameras
+        sceneCameras.forEach((cam, idx) => {
+          const item = document.createElement('div');
+          item.className = 'tree-item';
+          if (cam === selectedCamera) item.classList.add('selected');
+          const active = scene.activeCamera === cam;
+          const hasFX = cam.postFXEnabled && cam.postFXPipeline;
+          let label = cam.userData.name || `Camera ${idx + 1}`;
+          if (active) label += ' ★';
+          if (hasFX) label += ' 🎨';
+          item.innerHTML = `<span class="tree-item-icon">📷</span>${label}`;
+          item.addEventListener('click', () => { selectCamera(cam); });
+          camerasList.appendChild(item);
+        });
+      }
+    }
+
+    // Duplicate selected light
+    function duplicateLight() {
+      if (!selectedLight) return;
+      
+      const type = selectedLight.userData.type;
+      const newLight = addLight(type);
+      
+      // Copy properties
+      newLight.position.copy(selectedLight.position);
+      newLight.position.x += 1;
+      newLight.position.z += 1;
+      
+      if (type !== 'ambient' && type !== 'hemisphere') {
+        newLight.color.copy(selectedLight.color);
+        newLight.intensity = selectedLight.intensity;
+      }
+      
+      if (type === 'hemisphere') {
+        newLight.color.copy(selectedLight.color);
+        newLight.groundColor.copy(selectedLight.groundColor);
+        newLight.intensity = selectedLight.intensity;
+      }
+      
+      if (type === 'point' || type === 'spot') {
+        newLight.distance = selectedLight.distance;
+        newLight.decay = selectedLight.decay;
+      }
+      
+      if (type === 'spot') {
+        newLight.angle = selectedLight.angle;
+        newLight.penumbra = selectedLight.penumbra;
+      }
+      
+      selectLight(newLight);
+    }
+
+    // Delete selected light
+    function deleteLight() {
+      if (!selectedLight) return;
+      
+      scene.remove(selectedLight);
+      if (selectedLight.target && selectedLight.target.isObject3D) {
+        scene.remove(selectedLight.target);
+      }
+      
+      const lightIndex = lights.indexOf(selectedLight);
+      if (lightIndex > -1) {
+        lights.splice(lightIndex, 1);
+      }
+      
+      const helperIndex = lightHelpers.findIndex(h => h.light === selectedLight);
+      if (helperIndex > -1) {
+        lightHelpers.splice(helperIndex, 1);
+      }
+      
+      selectedLight = null;
+      updatePropertiesPanel();
+      updateSceneTree();
+      drawSchematic();
+    }
+
+    // Animation loop
+    function animate(currentTime) {
+      animationId = requestAnimationFrame(animate);
+      
+      if (controls) {
+        controls.update();
+      }
+      
+      // Update all light helpers
+      lightHelpers.forEach(helper => {
+        if (helper.update) {
+          // Update helper position to match light
+          if (helper.light) {
+            helper.position.copy(helper.light.position);
+          }
+          helper.update();
+        }
+      });
+
+      // Update all camera helpers
+      cameraHelpers.forEach(helper => {
+        if (helper.update) helper.update();
+      });
+      
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    // Button event listeners
+    document.getElementById('btnAddPoint').addEventListener('click', () => {
+      addLight('point');
+    });
+
+    document.getElementById('btnAddSpot').addEventListener('click', () => {
+      addLight('spot');
+    });
+
+    document.getElementById('btnAddDirectional').addEventListener('click', () => {
+      addLight('directional');
+    });
+
+    document.getElementById('btnAddHemisphere').addEventListener('click', () => {
+      addLight('hemisphere');
+    });
+
+    document.getElementById('btnAddAmbient').addEventListener('click', () => {
+      addLight('ambient');
+    });
+
+    document.getElementById('btnAddSphere').addEventListener('click', () => {
+      addObject('sphere');
+    });
+
+    document.getElementById('btnAddCube').addEventListener('click', () => {
+      addObject('cube');
+    });
+
+    // Phase 3: Material preset buttons
+    document.getElementById('btnPresetGold').addEventListener('click', () => {
+      applyMaterialPreset('gold');
+    });
+
+    document.getElementById('btnPresetPlastic').addEventListener('click', () => {
+      applyMaterialPreset('plastic');
+    });
+
+    document.getElementById('btnPresetWood').addEventListener('click', () => {
+      applyMaterialPreset('wood');
+    });
+
+    document.getElementById('btnPresetMetal').addEventListener('click', () => {
+      applyMaterialPreset('metal');
+    });
+
+    // Camera buttons
+    document.getElementById('btnAddCamera').addEventListener('click', () => {
+      addSceneCamera();
+    });
+
+    document.getElementById('btnCameraDemoSetup').addEventListener('click', () => {
+      cameraDemoSetup();
+    });
+
+    // Dither buttons
+    document.getElementById('btnToggleDither').addEventListener('click', () => {
+      toggleDither();
+    });
+
+    document.getElementById('ditherStrength').addEventListener('input', updateDitherParams);
+    document.getElementById('ditherBias').addEventListener('input', updateDitherParams);
+    document.getElementById('ditherMatrix').addEventListener('change', updateDitherParams);
+    document.getElementById('ditherInvert').addEventListener('change', updateDitherParams);
+    document.getElementById('btnDitherMacPaint').addEventListener('click', () => {
+      document.getElementById('ditherStrength').value = 1;
+      document.getElementById('ditherBias').value = 0;
+      document.getElementById('ditherMatrix').value = '8';
+      document.getElementById('ditherInvert').checked = false;
+      updateDitherParams();
+    });
+
+    document.getElementById('btnClearLights').addEventListener('click', () => {
+      if (confirm('Clear all lights?')) {
+        clearLights();
+      }
+    });
+
+    document.getElementById('btnClearAll').addEventListener('click', () => {
+      if (confirm('Clear all objects and lights?')) {
+        clearAll();
+      }
+    });
+
+    // Export / Import scene
+    document.getElementById('btnExportScene').addEventListener('click', () => {
+      exportScene();
+    });
+
+    document.getElementById('btnImportScene').addEventListener('click', () => {
+      document.getElementById('importFileInput').click();
+    });
+
+    document.getElementById('importFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        importScene(ev.target.result);
+      };
+      reader.readAsText(file);
+      // Reset so the same file can be re-imported
+      e.target.value = '';
+    });
+
+    // Grid toggle
+    document.getElementById('btnToggleGrid').addEventListener('click', (e) => {
+      const btn = e.target;
+      if (gridOverlay) {
+        const nowVisible = !gridOverlay.visible;
+        gridOverlay.setVisible(nowVisible);
+        btn.textContent = nowVisible ? 'Hide Grid' : 'Show Grid';
+      }
+    });
+
+    // Phase 1: Global shadow enable/disable
+    document.getElementById('btnToggleShadows').addEventListener('click', async (e) => {
+      const btn = e.target;
+      if (renderer && renderer.shadows) {
+        const enabling = !renderer.shadows.enabled;
+        
+        // If enabling shadows and not on WebGL2, auto-switch first
+        if (enabling && renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+          console.log('Shadows require WebGL2 (Phase 1). Auto-switching backend...');
+          await forceWebGL2Backend();
+        }
+        
+        renderer.shadows.enabled = enabling;
+        btn.textContent = renderer.shadows.enabled ? 'Disable Shadows' : 'Enable Shadows';
+        btn.style.background = renderer.shadows.enabled ? '#1e4620' : '#21262d';
+        btn.style.borderColor = renderer.shadows.enabled ? '#51cf66' : '#30363d';
+        
+        if (renderer.shadows.enabled) {
+          console.log('Shadows enabled (WebGL2 backend)');
+          
+          // Auto-enable castShadow on existing directional/spot lights
+          let autoEnabledCount = 0;
+          lights.forEach(light => {
+            if ((light.isDirectionalLight || light.isSpotLight) && !light.castShadow) {
+              light.castShadow = true;
+              autoEnabledCount++;
+            }
+          });
+          if (autoEnabledCount > 0) {
+            console.log(`Auto-enabled castShadow on ${autoEnabledCount} existing light(s)`);
+          }
+          
+          // Auto-enable castShadow and receiveShadow on existing meshes
+          let meshCount = 0;
+          scene.traverse((obj) => {
+            if (obj.isMesh) {
+              if (!obj.castShadow) obj.castShadow = true;
+              if (!obj.receiveShadow) obj.receiveShadow = true;
+              meshCount++;
+            }
+          });
+          if (meshCount > 0) {
+            console.log(`Auto-enabled castShadow/receiveShadow on ${meshCount} existing mesh(es)`);
+          }
+          
+          // Create ground plane if shadows enabled and no receiver exists
+          ensureGroundPlane();
+        }
+        
+        updateBackendIndicator();
+      }
+    });
+
+    // Phase 5: Environment Map controls
+    ['None', 'Sky', 'Studio', 'Sunset'].forEach(label => {
+      const btn = document.getElementById('btnEnv' + label);
+      if (btn) {
+        btn.addEventListener('click', () => {
+          currentEnvMap = label.toLowerCase();
+          applyEnvironment();
+        });
+      }
+    });
+
+    document.getElementById('envIntensity').addEventListener('input', (e) => {
+      document.getElementById('envIntensityVal').textContent = parseFloat(e.target.value).toFixed(1);
+      if (scene) scene.environmentIntensity = parseFloat(e.target.value);
+    });
+
+    // Phase 5: Reflection Probe controls
+    document.getElementById('btnAddReflectionProbe').addEventListener('click', async () => {
+      if (!renderer || !scene) return;
+
+      // Ensure WebGL2 backend
+      if (renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+        await forceWebGL2Backend();
+      }
+
+      if (reflectionProbe) {
+        // Already exists — remove it
+        scene.removeReflectionProbe(reflectionProbe);
+        scene.remove(reflectionProbe);
+        reflectionProbe.dispose();
+        reflectionProbe = null;
+        document.getElementById('btnAddReflectionProbe').textContent = 'Add Reflection Probe';
+        document.getElementById('btnCaptureProbe').style.display = 'none';
+        document.getElementById('probe-status').textContent = 'Probe removed';
+        return;
+      }
+
+      reflectionProbe = new ReflectionProbe({
+        resolution: 256,
+        influenceRadius: 50,
+        updateMode: 'manual'
+      });
+      reflectionProbe.position.set(0, 2, 0);
+      scene.add(reflectionProbe);
+      scene.addReflectionProbe(reflectionProbe);
+
+      document.getElementById('btnAddReflectionProbe').textContent = 'Remove Probe';
+      document.getElementById('btnAddReflectionProbe').style.background = '#1e4620';
+      document.getElementById('btnAddReflectionProbe').style.borderColor = '#51cf66';
+      document.getElementById('btnCaptureProbe').style.display = 'block';
+      document.getElementById('probe-status').textContent = 'Probe added at (0, 2, 0) — click Capture!';
+    });
+
+    document.getElementById('btnCaptureProbe').addEventListener('click', () => {
+      if (!reflectionProbe || !renderer || !scene) return;
+      const t0 = performance.now();
+      reflectionProbe.update(renderer, scene);
+      const dt = (performance.now() - t0).toFixed(1);
+      document.getElementById('probe-status').textContent = `Captured in ${dt}ms`;
+      document.getElementById('probe-status').style.color = '#51cf66';
+    });
+
+    // ── Screen-Space Reflections controls ──
+    let ssrActive = false;
+
+    document.getElementById('btnToggleSSR').addEventListener('click', async () => {
+      if (!renderer) return;
+
+      // Ensure WebGL2
+      if (renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+        await forceWebGL2Backend();
+      }
+
+      ssrActive = !ssrActive;
+      renderer.enableSSR(ssrActive);
+
+      const btn = document.getElementById('btnToggleSSR');
+      const controlsDiv = document.getElementById('ssr-controls');
+      const statusDiv = document.getElementById('ssr-status');
+
+      if (ssrActive) {
+        btn.textContent = 'Disable SSR';
+        btn.style.background = 'rgba(255,107,107,0.15)';
+        btn.style.borderColor = '#ff6b6b';
+        controlsDiv.style.display = 'block';
+        statusDiv.textContent = 'SSR enabled';
+        statusDiv.style.color = '#51cf66';
+        console.log('[light-playground] SSR enabled');
+      } else {
+        btn.textContent = 'Enable SSR';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        controlsDiv.style.display = 'none';
+        statusDiv.textContent = 'SSR disabled';
+        statusDiv.style.color = '#8b949e';
+        console.log('[light-playground] SSR disabled');
+      }
+    });
+
+    // Debug view dropdown
+    document.getElementById('ssrDebugView').addEventListener('change', (e) => {
+      if (!renderer || !renderer.ssrPass) return;
+      renderer.ssrPass.ssrOptions.debugView = e.target.value;
+      console.log('[light-playground] SSR debug view:', e.target.value);
+    });
+
+    // SSR sliders
+    const ssrSliders = [
+      { id: 'ssrStepCount',  valId: 'ssrStepVal',  key: 'stepCount',       parse: parseInt },
+      { id: 'ssrMaxDist',    valId: 'ssrDistVal',   key: 'maxDistance',     parse: parseFloat },
+      { id: 'ssrThickness',  valId: 'ssrThickVal',  key: 'thickness',       parse: parseFloat },
+      { id: 'ssrRoughFade',  valId: 'ssrRoughVal',  key: 'roughnessFade',   parse: parseFloat },
+      { id: 'ssrConfidence', valId: 'ssrConfVal',    key: 'minConfidence', parse: parseFloat },
+    ];
+    ssrSliders.forEach(({ id, valId, key, parse }) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        const val = parse(e.target.value);
+        document.getElementById(valId).textContent = e.target.value;
+        if (renderer && renderer.ssrPass) {
+          renderer.ssrPass.ssrOptions[key] = val;
+        }
+      });
+    });
+
+    // SSR Demo Setup — one-click scene for testing SSR
+    document.getElementById('btnSSRDemoSetup').addEventListener('click', async () => {
+      if (!renderer || !scene) return;
+
+      // Ensure WebGL2
+      if (renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+        await forceWebGL2Backend();
+      }
+
+      // Clear existing scene
+      clearAll();
+
+      // Floor — slightly reflective grey PBR
+      const floor = new Mesh(
+        new PlaneGeometry(30, 30),
+        new PBRMaterial({ color: new Color(0.25, 0.25, 0.3), metallic: 0.0, roughness: 0.6 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = 0;
+      floor.receiveShadow = true;
+      floor.userData.name = 'SSR Floor';
+      floor.userData.originalColor = 0x404050;
+      scene.add(floor);
+      sceneObjects.push(floor);
+
+      // Red cube — slightly glossy dielectric
+      const redCube = new Mesh(
+        new BoxGeometry(1.5, 1.5, 1.5),
+        new PBRMaterial({ color: new Color(0.9, 0.1, 0.1), metallic: 0.0, roughness: 0.35 })
+      );
+      redCube.position.set(-2.0, 0.75, 0);
+      redCube.castShadow = true;
+      redCube.receiveShadow = true;
+      redCube.userData.name = 'Red Cube';
+      redCube.userData.originalColor = 0xe61a1a;
+      scene.add(redCube);
+      sceneObjects.push(redCube);
+
+      // Chrome sphere — pure mirror metal
+      const chromeSphere = new Mesh(
+        new SphereGeometry(1.0, 48, 32),
+        new PBRMaterial({ color: new Color(0.95, 0.95, 0.97), metallic: 1.0, roughness: 0.05 })
+      );
+      chromeSphere.position.set(2.0, 1.0, 0);
+      chromeSphere.castShadow = true;
+      chromeSphere.receiveShadow = true;
+      chromeSphere.userData.name = 'Chrome Sphere';
+      chromeSphere.userData.originalColor = 0xf2f2f8;
+      scene.add(chromeSphere);
+      sceneObjects.push(chromeSphere);
+
+      // Bright directional light
+      lightCounter.directional++;
+      const dirLight = new DirectionalLight(0xffffff, 1.5);
+      dirLight.position.set(5, 8, 4);
+      dirLight.target = new Vector3(0, 0, 0);
+      dirLight.castShadow = true;
+      dirLight.userData.name = 'SSR Demo Light';
+      dirLight.userData.type = 'directional';
+      scene.add(dirLight);
+      lights.push(dirLight);
+      dirLight.enabled = true;
+      const dirHelper = new DirectionalLightHelper(dirLight, 1.5);
+      scene.add(dirHelper);
+      lightHelpers.push(dirHelper);
+
+      // Enable SSR
+      ssrActive = true;
+      renderer.enableSSR(true);
+      document.getElementById('btnToggleSSR').textContent = 'Disable SSR';
+      document.getElementById('btnToggleSSR').style.background = 'rgba(255,107,107,0.15)';
+      document.getElementById('btnToggleSSR').style.borderColor = '#ff6b6b';
+      document.getElementById('ssr-controls').style.display = 'block';
+      document.getElementById('ssr-status').textContent = 'SSR Demo active';
+      document.getElementById('ssr-status').style.color = '#51cf66';
+
+      updateSceneTree();
+      updateBackendIndicator();
+      console.log('[light-playground] SSR Demo Setup complete — red cube at (-2, 0.75, 0), chrome sphere at (2, 1, 0)');
+    });
+
+    // Phase 1: Force WebGL2 backend
+    // Helper: Force switch to WebGL2 backend (reusable)
+    async function forceWebGL2Backend() {
+      if (!renderer) return;
+      
+      // Check if already on WebGL2
+      if (renderer.backend && renderer.backend.gpuAPI === 'webgl2') {
+        console.log('Already on WebGL2 backend');
+        return;
+      }
+      
+      // Clear scene and dispose of grid overlay
+      clearAll();
+      
+      // Explicitly remove grid overlay from scene
+      if (gridOverlay && scene) {
+        gridOverlay.removeFromScene(scene);
+        gridOverlay = null;
+      }
+      
+      // Dispose old controls
+      if (controls) {
+        controls.dispose();
+        controls = null;
+      }
+      
+      // Temporarily set renderer to null to stop rendering during reinitialization
+      const oldRenderer = renderer;
+      renderer = null;
+      
+      // Dispose old renderer if it has a dispose method
+      if (oldRenderer.dispose) {
+        oldRenderer.dispose();
+      }
+      
+      // CRITICAL: Canvas context cannot be changed once created.
+      // We must create a new canvas element to switch from WebGPU to WebGL2
+      const oldCanvas = document.getElementById('canvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      
+      // Copy all attributes and styles
+      newCanvas.style.cssText = oldCanvas.style.cssText;
+      newCanvas.width = oldCanvas.width;
+      newCanvas.height = oldCanvas.height;
+      
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      
+      // Reinitialize with WebGL2 on the new canvas
+      await initRenderer('webgl2');
+      
+      // Recreate scene (this also recreates camera and adds default lights)
+      createScene();
+      
+      // IMPORTANT: Recreate controls with the new camera
+      if (controls) {
+        controls.dispose();
+      }
+      controls = new OrbitControls(camera, newCanvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      
+      // CRITICAL: Reattach mouse event listeners to the new canvas
+      attachCanvasEventListeners();
+      
+      updateBackendIndicator();
+      updateSceneTree();
+      
+      // Reset grid toggle button (new grid is always visible)
+      document.getElementById('btnToggleGrid').textContent = 'Hide Grid';
+      
+      console.log('Forced WebGL2 backend with fresh canvas');
+    }
+
+    document.getElementById('btnForceWebGL2').addEventListener('click', async () => {
+      await forceWebGL2Backend();
+    });
+
+    document.getElementById('btnDuplicate').addEventListener('click', () => {
+      duplicateLight();
+    });
+
+    document.getElementById('btnDelete').addEventListener('click', () => {
+      if (confirm('Delete selected light?')) {
+        deleteLight();
+      }
+    });
+
+    // Function to attach canvas event listeners
+    function attachCanvasEventListeners() {
+      const canvas = document.getElementById('canvas');
+      canvas.addEventListener('mousedown', onMouseDown);
+      canvas.addEventListener('mousemove', onMouseMove);
+      canvas.addEventListener('mouseup', onMouseUp);
+    }
+
+    // Mouse event listeners
+    attachCanvasEventListeners();
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    });
+
+    // Initialize
+    createScene();
+    initRenderer('gpu');
+    updateSceneTree();
+    drawSchematic();
+  </script>
+</body>
+</html>

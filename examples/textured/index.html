@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3d - Textured Platonic Solids</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #0d1117;
+      color: #fff;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 12px 18px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 350px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    #debug {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 11px;
+      line-height: 1.5;
+      font-family: 'Courier New', monospace;
+      color: #79c0ff;
+      border: 1px solid rgba(121, 192, 255, 0.3);
+    }
+    
+    #canvas {
+      display: block;
+      margin: 0;
+    }
+    
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 20px;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+    
+    p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: #c9d1d9;
+    }
+    
+    .feature {
+      margin: 8px 0;
+      padding: 6px 10px;
+      background: rgba(88, 166, 255, 0.1);
+      border-radius: 4px;
+      font-size: 12px;
+      border-left: 3px solid #58a6ff;
+    }
+    
+    .highlight {
+      color: #79c0ff;
+      font-weight: 600;
+    }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 90px;
+    }
+    
+    button {
+      width: 100%;
+      padding: 6px 8px;
+      margin: 3px 0;
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: background 0.2s;
+      line-height: 1.3;
+    }
+    
+    button:hover {
+      background: #2ea043;
+    }
+    
+    button.active {
+      background: #1f6feb;
+    }
+    
+    button.active:hover {
+      background: #388bfd;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <h1>🎨 BangBang3d: Platonic Solids</h1>
+    <p><span class="highlight">Milestone D Complete!</span></p>
+    <p id="fps">FPS: --</p>
+    
+    <div class="feature">
+      ✓ Perspective-correct UV interpolation<br>
+      ✓ Bilinear texture filtering<br>
+      ✓ Procedural texture generation<br>
+      ✓ Texture wrapping modes
+    </div>
+    
+    <p style="margin-top: 10px; font-size: 11px; opacity: 0.7;">
+      All textures are procedurally generated - no external assets required!
+    </p>
+  </div>
+  
+  <div id="debug">
+    <div style="color: #58a6ff; font-weight: bold; margin-bottom: 4px;">📊 Camera Debug Info</div>
+    <div id="debugInfo">Initializing...</div>
+  </div>
+  
+  <div id="controls">
+    <div style="margin-bottom: 8px; font-weight: 600; color: #c9d1d9;">Backend:</div>
+    <button id="btnCPU">CPU</button>
+    <button id="btnGPU" class="active">GPU</button>
+    <button id="btnAuto">Auto</button>
+    
+    <div style="margin: 16px 0 8px; font-weight: 600; color: #c9d1d9; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">Geometry:</div>
+    <button id="btnTetrahedron">Tetrahedron</button>
+    <button id="btnCube" class="active">Cube</button>
+    <button id="btnOctahedron">Octahedron</button>
+    <button id="btnDodecahedron">Dodecahedron</button>
+    <button id="btnIcosahedron">Icosahedron</button>
+    <button id="btnSphere">Sphere</button>
+    
+    <div style="margin: 16px 0 8px; font-weight: 600; color: #c9d1d9; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">Textures:</div>
+    <button id="btnChecker" class="active">Checker</button>
+    <button id="btnUVTest">UV Test</button>
+    <button id="btnGrid">Grid</button>
+    <button id="btnWood">Wood</button>
+    <button id="btnBrick">Brick</button>
+    
+    <div style="margin: 16px 0 8px; font-weight: 600; color: #c9d1d9; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">Viewport Grid:</div>
+    <button id="btnGridToggle" class="active">Hide Grid</button>
+    <div style="margin: 8px 0; color: #8b949e; font-size: 11px;">Grid Opacity:</div>
+    <input type="range" id="gridOpacity" min="0" max="100" value="100" style="width: 100%;">
+    <div id="gridOpacityValue" style="text-align: center; color: #58a6ff; font-size: 11px; margin-top: 4px;">100%</div>
+    
+    <div style="margin: 8px 0; color: #8b949e; font-size: 11px;">Grid Alpha Boost:</div>
+    <input type="range" id="gridAlpha" min="0" max="200" value="65" style="width: 100%;">
+    <div id="gridAlphaValue" style="text-align: center; color: #58a6ff; font-size: 11px; margin-top: 4px;">0.65</div>
+    
+    <div style="margin: 8px 0; color: #8b949e; font-size: 11px;">Grid Color:</div>
+    <input type="color" id="gridColor" value="#878787" style="width: 100%; height: 30px; cursor: pointer;">
+    
+    <div style="margin: 8px 0; color: #8b949e; font-size: 11px;">Background:</div>
+    <input type="color" id="bgColor" value="#505050" style="width: 100%; height: 30px; cursor: pointer;">
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      PlaneGeometry,
+      SphereGeometry,
+      TetrahedronGeometry,
+      OctahedronGeometry,
+      IcosahedronGeometry,
+      DodecahedronGeometry,
+      BasicMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      Vector3,
+      Color,
+      GridOverlay
+    } from '../../src/index.js';
+    
+    import { TextureLoader } from '../../src/resources/TextureLoader.js';
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // Global variables
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let cube = null;
+    let plane = null;
+    let gridOverlay = null;
+    let animationId = null;
+    
+    const textures = {};
+    const geometries = {};
+    let currentGeometry = 'cube';
+    let currentTexture = 'checker';
+
+    // Initialize renderer with specified backend
+    async function initRenderer(backendType) {
+      // Dispose old renderer if it exists
+      if (renderer) {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
+        renderer.dispose();
+        renderer = null;
+      }
+
+      console.log(`Initializing ${backendType} backend...`);
+
+      // Important: Replace the canvas element to clear WebGPU context
+      // Once a canvas is configured for WebGPU, it can't be used for 2D context
+      const oldCanvas = document.getElementById('canvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      
+      // Update canvas reference
+      const canvas = document.getElementById('canvas');
+
+      // Create renderer with specified backend
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: backendType
+      });
+
+      // Wait for initialization (GPU is async)
+      await renderer.initialize();
+      
+      if (!renderer.isReady()) {
+        console.error('Renderer failed to initialize');
+        return;
+      }
+      
+      renderer.setClearColor(0x0d1117);
+      
+      console.log('Backend initialized:', renderer.backendType);
+      console.log('Capabilities:', renderer.capabilities);
+
+      // Recreate controls with new canvas
+      if (controls) {
+        controls.dispose();
+      }
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Start animation loop
+      if (!animationId) {
+        animate(performance.now());
+      }
+    }
+
+    // Create scene and objects (called once at startup)
+    function createScene() {
+      // Create scene
+      scene = new Scene();
+      scene.background = new Color(0.314, 0.314, 0.314); // RGB(80, 80, 80) grey background
+
+      // Create camera
+      camera = new PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.5,
+        100
+      );
+      camera.position.set(6.85, 10.72, 16.87);
+      camera.lookAt(new Vector3(0, 0, 0));
+      
+      // Controls will be created in initRenderer with the canvas
+
+      // Create texture loader
+      const textureLoader = new TextureLoader();
+
+      // Generate procedural textures
+      textures.checker = textureLoader.createCheckerTexture(256, 8);
+      textures.uvTest = textureLoader.createUVTestTexture(512);
+      textures.grid = textureLoader.createGridTexture(256, 32, 2);
+      textures.wood = textureLoader.createWoodTexture(512);
+      textures.brick = textureLoader.createBrickTexture(512);
+
+      // Set filtering
+      for (const key in textures) {
+        textures[key].magFilter = 'linear';
+        textures[key].minFilter = 'linear';
+      }
+
+      // Create geometries for platonic solids and sphere
+      geometries.tetrahedron = new TetrahedronGeometry(1.2);
+      geometries.cube = new BoxGeometry(1.5, 1.5, 1.5);
+      geometries.octahedron = new OctahedronGeometry(1.2);
+      geometries.dodecahedron = new DodecahedronGeometry(1.2);
+      geometries.icosahedron = new IcosahedronGeometry(1.2);
+      geometries.sphere = new SphereGeometry(1.2, 32, 24);
+
+      // Debug: Log sphere geometry info
+      console.log('Sphere geometry created:');
+      console.log('  Vertices:', geometries.sphere.attributes.position ? geometries.sphere.attributes.position.count : 'none');
+      console.log('  Indices:', geometries.sphere.index ? geometries.sphere.index.count : 'none');
+      console.log('  Triangles:', geometries.sphere.index ? geometries.sphere.index.count / 3 : 0);
+
+      // Create mesh with textured material (start with cube)
+      const cubeMaterial = new BasicMaterial({
+        color: 0xffffff,
+        map: textures.checker
+      });
+      cube = new Mesh(geometries.cube, cubeMaterial);
+      cube.position.y = 0.75;
+      scene.add(cube);
+
+      // Create ground plane with texture (using thin box for thickness)
+      const planeGeometry = new BoxGeometry(6, 0.1, 6);
+      const planeMaterial = new BasicMaterial({
+        color: 0xffffff,
+        map: textures.grid
+      });
+      planeMaterial.side = 'DoubleSide'; // Render both sides to prevent disappearing
+      plane = new Mesh(planeGeometry, planeMaterial);
+      plane.position.set(0, -0.4, 0); // Position below cube (raised from -0.8 to reduce near-plane issues)
+      scene.add(plane);
+      
+      // Create infinite grid overlay (Blender-style)
+      gridOverlay = new GridOverlay({
+        yPosition: -0.4, // Match ground plane position
+        gridScale: 1.0,
+        gridOpacity: 1.0,
+        fadeDistance: 100.0,
+        adaptive: false, // Keep consistent grid spacing like Blender
+        axisXColor: { r: 1.0, g: 0.2, b: 0.2 }, // Bright red X axis
+        axisZColor: { r: 0.2, g: 1.0, b: 0.2 }, // Bright green Z axis
+        horizonColor: { r: 0.05, g: 0.067, b: 0.09 } // Match scene background
+      });
+      gridOverlay.addToScene(scene);
+    }
+
+    // Get canvas and set up initial renderer
+    createScene();
+
+    // Geometry switching
+    function setGeometry(geometryName) {
+      console.log('Switching to geometry:', geometryName);
+      currentGeometry = geometryName;
+      cube.geometry = geometries[geometryName];
+      console.log('  New geometry triangles:', cube.geometry.index ? cube.geometry.index.count / 3 : 0);
+      
+      // Update geometry button states
+      const geometryButtons = ['btnTetrahedron', 'btnCube', 'btnOctahedron', 'btnDodecahedron', 'btnIcosahedron', 'btnSphere'];
+      geometryButtons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.classList.remove('active');
+      });
+      
+      // Map geometry names to button IDs
+      const geometryButtonIds = {
+        'tetrahedron': 'btnTetrahedron',
+        'cube': 'btnCube',
+        'octahedron': 'btnOctahedron',
+        'dodecahedron': 'btnDodecahedron',
+        'icosahedron': 'btnIcosahedron',
+        'sphere': 'btnSphere'
+      };
+      
+      const buttonId = geometryButtonIds[geometryName];
+      if (buttonId) {
+        const btn = document.getElementById(buttonId);
+        if (btn) btn.classList.add('active');
+      }
+    }
+
+    // Texture switching
+    function setTexture(textureName) {
+      currentTexture = textureName;
+      cube.material.map = textures[textureName];
+      
+      // Update texture button states
+      const textureButtons = ['btnChecker', 'btnUVTest', 'btnGrid', 'btnWood', 'btnBrick'];
+      textureButtons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.classList.remove('active');
+      });
+      
+      // Map texture names to button IDs
+      const buttonIds = {
+        'checker': 'btnChecker',
+        'uvTest': 'btnUVTest',
+        'grid': 'btnGrid',
+        'wood': 'btnWood',
+        'brick': 'btnBrick'
+      };
+      
+      const buttonId = buttonIds[textureName];
+      if (buttonId) {
+        const btn = document.getElementById(buttonId);
+        if (btn) btn.classList.add('active');
+      }
+    }
+
+    // Backend switching
+    document.getElementById('btnCPU').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnCPU').classList.add('active');
+      await initRenderer('cpu');
+    });
+
+    document.getElementById('btnGPU').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnGPU').classList.add('active');
+      await initRenderer('gpu');
+    });
+
+    document.getElementById('btnAuto').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnAuto').classList.add('active');
+      await initRenderer('auto');
+    });
+
+    // Geometry button event listeners
+    document.getElementById('btnTetrahedron').addEventListener('click', () => setGeometry('tetrahedron'));
+    document.getElementById('btnCube').addEventListener('click', () => setGeometry('cube'));
+    document.getElementById('btnOctahedron').addEventListener('click', () => setGeometry('octahedron'));
+    document.getElementById('btnDodecahedron').addEventListener('click', () => setGeometry('dodecahedron'));
+    document.getElementById('btnIcosahedron').addEventListener('click', () => setGeometry('icosahedron'));
+    document.getElementById('btnSphere').addEventListener('click', () => setGeometry('sphere'));
+
+    // Texture button event listeners
+    document.getElementById('btnChecker').addEventListener('click', () => setTexture('checker'));
+    document.getElementById('btnUVTest').addEventListener('click', () => setTexture('uvTest'));
+    document.getElementById('btnGrid').addEventListener('click', () => setTexture('grid'));
+    document.getElementById('btnWood').addEventListener('click', () => setTexture('wood'));
+    document.getElementById('btnBrick').addEventListener('click', () => setTexture('brick'));
+
+    // Grid overlay controls
+    document.getElementById('btnGridToggle').addEventListener('click', (e) => {
+      if (gridOverlay) {
+        gridOverlay.visible = !gridOverlay.visible;
+        gridOverlay.setVisible(gridOverlay.visible);
+        e.target.classList.toggle('active', gridOverlay.visible);
+        e.target.textContent = gridOverlay.visible ? 'Hide Grid' : 'Show Grid';
+      }
+    });
+
+    document.getElementById('gridOpacity').addEventListener('input', (e) => {
+      const opacity = parseInt(e.target.value) / 100;
+      if (gridOverlay) {
+        gridOverlay.setOpacity(opacity);
+      }
+      document.getElementById('gridOpacityValue').textContent = `${e.target.value}%`;
+    });
+
+    document.getElementById('gridAlpha').addEventListener('input', (e) => {
+      const alpha = parseInt(e.target.value) / 100;
+      if (gridOverlay) {
+        gridOverlay.setGridAlpha(alpha);
+      }
+      document.getElementById('gridAlphaValue').textContent = alpha.toFixed(2);
+    });
+    
+    document.getElementById('gridColor').addEventListener('input', (e) => {
+      const hex = e.target.value;
+      // Convert hex to RGB (0-1 range)
+      const r = parseInt(hex.substr(1, 2), 16) / 255;
+      const g = parseInt(hex.substr(3, 2), 16) / 255;
+      const b = parseInt(hex.substr(5, 2), 16) / 255;
+      if (gridOverlay) {
+        gridOverlay.setGridColor(r, g, b);
+      }
+    });
+    
+    document.getElementById('bgColor').addEventListener('input', (e) => {
+      const hex = e.target.value;
+      // Convert hex to integer color value for renderer
+      const colorValue = parseInt(hex.substr(1), 16);
+      // Convert hex to RGB (0-1 range) for scene background
+      const r = parseInt(hex.substr(1, 2), 16) / 255;
+      const g = parseInt(hex.substr(3, 2), 16) / 255;
+      const b = parseInt(hex.substr(5, 2), 16) / 255;
+      if (renderer) {
+        renderer.setClearColor(colorValue);
+      }
+      if (scene) {
+        scene.background.r = r;
+        scene.background.g = g;
+        scene.background.b = b;
+      }
+    });
+
+    // Helper function to get render stats (works for both CPU and GPU backends)
+    function getRenderStats() {
+      if (!renderer) {
+        return { trianglesRendered: 0, trianglesSubmitted: 0, trianglesClipped: 0, trianglesCulled: 0 };
+      }
+      
+      if (renderer.backendType === 'cpu' && renderer._backend && renderer._backend.pipeline) {
+        // CPU backend has detailed pipeline stats
+        const stats = renderer._backend.pipeline.stats;
+        return {
+          trianglesRendered: stats.trianglesRendered || 0,
+          trianglesSubmitted: stats.trianglesSubmitted || 0,
+          trianglesClipped: stats.trianglesClippedNear || 0,
+          trianglesCulled: stats.trianglesCulled || 0
+        };
+      } else {
+        // GPU backend has simpler info
+        const info = renderer.info.render;
+        return {
+          trianglesRendered: info.triangles || 0,
+          trianglesSubmitted: info.triangles || 0,
+          trianglesClipped: 0,
+          trianglesCulled: 0
+        };
+      }
+    }
+
+    // Helper function to reset stats (if supported by backend)
+    function resetRenderStats() {
+      if (renderer && renderer.backendType === 'cpu' && renderer._backend && renderer._backend.pipeline) {
+        renderer._backend.pipeline.resetStats();
+      }
+      // GPU backend auto-resets per frame, no action needed
+    }
+
+    // Animation loop
+    let lastTime = performance.now();
+    let frames = 0;
+    let fps = 0;
+
+    function animate(currentTime) {
+      if (!renderer || !renderer.isReady()) {
+        return;
+      }
+      
+      animationId = requestAnimationFrame(animate);
+
+      // Update FPS counter
+      frames++;
+      if (currentTime >= lastTime + 1000) {
+        fps = frames;
+        frames = 0;
+        lastTime = currentTime;
+        document.getElementById('fps').textContent = `FPS: ${fps}`;
+      }
+
+      // Update debug info every frame
+      const debugInfo = renderer.getDebugInfo();
+      const stats = getRenderStats();
+      if (debugInfo.camera) {
+        document.getElementById('debugInfo').innerHTML = `
+          Near: ${debugInfo.camera.near} | Far: ${debugInfo.camera.far}<br>
+          FOV: ${debugInfo.camera.fov}° | Distance: ${debugInfo.camera.distance}<br>
+          Position: ${debugInfo.camera.position}<br>
+          Backend: <span style="color: #79c0ff;">${renderer.backendType}</span><br>
+          <span style="opacity: 0.8; color: #0f0;">Tris: ${stats.trianglesRendered}/${stats.trianglesSubmitted} | Clipped: ${stats.trianglesClipped} | Culled: ${stats.trianglesCulled}</span>
+        `;
+      }
+
+      // Reset stats for next frame
+      resetRenderStats();
+
+      // Update controls
+      if (controls) {
+        controls.update();
+      }
+      
+      // Grid overlay stays at world origin (0,0,0) for accurate world-space axes
+      // The 1000-unit plane is large enough for normal use
+      // if (gridOverlay && camera) {
+      //   gridOverlay.updatePosition(camera);
+      // }
+
+      // Render scene
+      try {
+        renderer.render(scene, camera);
+      } catch (error) {
+        console.error('Render error:', error);
+      }
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (renderer) {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      if (camera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      }
+    });
+
+    // Initialize with GPU backend by default
+    initRenderer('gpu');
+
+    console.log('BangBang3d Textured Platonic Solids Example - Milestone D');
+    console.log('✓ Perspective-correct UV interpolation');
+    console.log('✓ Texture sampling with bilinear filtering');
+    console.log('✓ Procedural texture generation');
+    console.log('✓ All 5 Platonic solids supported');
+    console.log('Geometries available:', Object.keys(geometries).length);
+    console.log('Textures available:', Object.keys(textures).length);
+  </script>
+</body>
+</html>

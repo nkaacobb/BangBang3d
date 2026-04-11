@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 4 Test - PBR, Lighting & Shadows</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            border: 2px solid #00ffaa;
+            box-shadow: 0 0 30px rgba(0, 255, 170, 0.4);
+            border-radius: 4px;
+        }
+
+        #controls {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 300px;
+            max-height: calc(100vh - 24px);
+            background: rgba(15, 15, 30, 0.95);
+            padding: 16px;
+            border: 1px solid rgba(0, 255, 170, 0.3);
+            border-radius: 6px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .control-section {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(26, 26, 46, 0.7);
+            border-radius: 4px;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .control-section h3 {
+            color: #00ffaa;
+            margin-bottom: 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            box-shadow: 0 0 15px rgba(250, 112, 154, 0.5);
+        }
+
+        .slider-control {
+            margin-bottom: 8px;
+        }
+
+        .slider-control label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 11px;
+            color: #00ffaa;
+        }
+
+        .slider-control input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .slider-control input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #00ffaa;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-control .value {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        #stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #0f0;
+            min-width: 240px;
+            pointer-events: none;
+        }
+
+        #stats .stat-line {
+            margin: 2px 0;
+        }
+
+        #stats .stat-header {
+            color: #fff;
+            font-weight: bold;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .checkbox-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .checkbox-control input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+        }
+
+        .checkbox-control label {
+            font-size: 11px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <div id="canvas-wrapper">
+        <canvas id="renderCanvas" width="900" height="700"></canvas>
+        <div id="stats"></div>
+    </div>
+
+    <div id="controls">
+        <div class="controls-grid">
+            <div class="control-section">
+                <h3>Material Type</h3>
+                <div class="button-group">
+                    <button id="mat-basic">Basic</button>
+                    <button id="mat-pbr" class="active">PBR</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Backend</h3>
+                <div class="button-group">
+                    <button id="btn-cpu">CPU</button>
+                    <button id="btn-gpu" class="active">GPU</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>PBR Properties</h3>
+            <div class="slider-control">
+                <label>Metallic: <span class="value" id="metallic-value">0.5</span></label>
+                <input type="range" id="metallic-slider" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            <div class="slider-control">
+                <label>Roughness: <span class="value" id="roughness-value">0.5</span></label>
+                <input type="range" id="roughness-slider" min="0.04" max="1" step="0.01" value="0.5">
+            </div>
+        </div>
+
+        <div class="controls-grid">
+            <div class="control-section">
+                <h3>Scene Objects</h3>
+                <div class="button-group">
+                    <button id="btn-add-sphere">Add Sphere</button>
+                    <button id="btn-add-cube">Add Cube</button>
+                    <button id="btn-clear">Clear</button>
+                </div>
+                <div class="checkbox-control">
+                    <input type="checkbox" id="cb-rotate" checked>
+                    <label for="cb-rotate">Rotate Objects</label>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Stats</h3>
+                <div class="checkbox-control">
+                    <input type="checkbox" id="cb-stats" checked>
+                    <label for="cb-stats">Show Performance</label>
+                </div>
+                <div class="stat-line" style="color: #00ffaa;">
+                    Phase 4: PBR & Lighting Active
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { BangBangRenderer } from '../../src/renderer/BangBangRenderer.js';
+    import { Scene } from '../../src/core/Scene.js';
+    import { PerspectiveCamera } from '../../src/core/PerspectiveCamera.js';
+    import { Mesh } from '../../src/core/Mesh.js';
+    import { BoxGeometry } from '../../src/geometry/BoxGeometry.js';
+    import { SphereGeometry } from '../../src/geometry/SphereGeometry.js';
+    import { BasicMaterial } from '../../src/materials/BasicMaterial.js';
+    import { PBRMaterial } from '../../src/materials/PBRMaterial.js';
+    import { DirectionalLight } from '../../src/lights/DirectionalLight.js';
+    import { PointLight } from '../../src/lights/PointLight.js';
+    import { SpotLight } from '../../src/lights/SpotLight.js';
+    import { Color } from '../../src/math/Color.js';
+
+    // Canvas and renderer
+    let canvas = document.getElementById('renderCanvas');
+    let renderer = new BangBangRenderer({ 
+        canvas, 
+        backend: 'gpu'
+    });
+    await renderer.initialize();
+
+    console.log('[Phase4Test] Renderer initialized');
+    console.log('[Phase4Test] Backend:', renderer.backend.backendType);
+    console.log('[Phase4Test] Capabilities:', renderer.backend.capabilities);
+
+    // Scene setup
+    const scene = new Scene();
+    scene.background = new Color(0.02, 0.02, 0.05);
+
+    const camera = new PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 100);
+    camera.position.set(0, 2, 6);
+    camera.lookAt(0, 0, 0);
+
+    // Lighting setup
+    const directionalLight = new DirectionalLight(new Color(1, 1, 1), 1.0);
+    directionalLight.position.set(5, 10, 5);
+    scene.add(directionalLight);
+
+    const pointLight = new PointLight(new Color(1, 0.5, 0.3), 0.5, 10, 2);
+    pointLight.position.set(-3, 2, 2);
+    scene.add(pointLight);
+
+    const spotLight = new SpotLight(new Color(0.3, 0.5, 1), 0.7, 15, Math.PI / 6, 0.1, 2);
+    spotLight.position.set(3, 4, 3);
+    spotLight.target.position.set(0, 0, 0);
+    scene.add(spotLight);
+
+    console.log('[Phase4Test] Lights added:', scene.children.filter(c => c.isLight).length);
+
+    // Scene objects
+    const objects = [];
+    let usePBR = true;
+    let currentMetallic = 0.5;
+    let currentRoughness = 0.5;
+    let rotating = true;
+
+    function addSphere() {
+        const geometry = new SphereGeometry(0.7, 32, 24);
+        
+        let material;
+        if (usePBR && renderer.backend.capabilities.supportsPBR) {
+            material = new PBRMaterial({
+                color: new Color(Math.random(), Math.random(), Math.random()),
+                metallic: currentMetallic,
+                roughness: currentRoughness
+            });
+        } else {
+            material = new BasicMaterial({
+                color: new Color(Math.random(), Math.random(), Math.random())
+            });
+        }
+        
+        const mesh = new Mesh(geometry, material);
+
+        mesh.position.set(
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 2,
+            (Math.random() - 0.5) * 4
+        );
+
+        scene.add(mesh);
+        objects.push(mesh);
+        
+        console.log('[Phase4Test] Added sphere. Material:', material.type);
+    }
+
+    function addCube() {
+        const geometry = new BoxGeometry(1.2, 1.2, 1.2);
+        
+        let material;
+        if (usePBR && renderer.backend.capabilities.supportsPBR) {
+            material = new PBRMaterial({
+                color: new Color(Math.random(), Math.random(), Math.random()),
+                metallic: currentMetallic,
+                roughness: currentRoughness
+            });
+        } else {
+            material = new BasicMaterial({
+                color: new Color(Math.random(), Math.random(), Math.random())
+            });
+        }
+        
+        const mesh = new Mesh(geometry, material);
+
+        mesh.position.set(
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 2,
+            (Math.random() - 0.5) * 4
+        );
+        
+        mesh.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+
+        scene.add(mesh);
+        objects.push(mesh);
+        
+        console.log('[Phase4Test] Added cube. Material:', material.type);
+    }
+
+    function clearScene() {
+        for (const obj of objects) {
+            scene.remove(obj);
+        }
+        objects.length = 0;
+    }
+
+    function updateMaterials() {
+        for (const obj of objects) {
+            if (obj.material && obj.material.type === 'PBRMaterial') {
+                obj.material.metallic = currentMetallic;
+                obj.material.roughness = currentRoughness;
+            }
+        }
+    }
+
+    // Add initial objects
+    addSphere();
+    addCube();
+
+    // Animation loop
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+    let animationId = null;
+
+    function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - lastTime) / 1000;
+        lastTime = currentTime;
+
+        // Rotate objects
+        if (rotating) {
+            for (const obj of objects) {
+                obj.rotation.x += deltaTime * 0.3;
+                obj.rotation.y += deltaTime * 0.5;
+            }
+        }
+
+        // Render scene
+        renderer.render(scene, camera);
+
+        // Update stats
+        frameCount++;
+        if (frameCount % 10 === 0) {
+            fps = 1 / deltaTime;
+        }
+
+        updateStats();
+    }
+
+    function updateStats() {
+        const statsDiv = document.getElementById('stats');
+        if (!document.getElementById('cb-stats').checked) {
+            statsDiv.style.display = 'none';
+            return;
+        }
+        statsDiv.style.display = 'block';
+
+        const backend = renderer.backend;
+        const info = renderer.info.render;
+
+        statsDiv.innerHTML = `
+            <div class="stat-header">BangBang3D Phase 4</div>
+            <div class="stat-line">Backend: ${backend.backendType}</div>
+            <div class="stat-line">API: ${backend.gpuAPI || 'cpu'}</div>
+            <div class="stat-line">FPS: <span style="color: ${fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0'}">${fps.toFixed(1)}</span></div>
+            <div class="stat-header">Scene</div>
+            <div class="stat-line">Objects: ${objects.length}</div>
+            <div class="stat-line">Lights: ${scene.children.filter(c => c.isLight).length}</div>
+            <div class="stat-line">Triangles: ${info.triangles.toLocaleString()}</div>
+            <div class="stat-header">Material</div>
+            <div class="stat-line">Type: ${usePBR ? 'PBR' : 'Basic'}</div>
+            <div class="stat-line">Metallic: ${currentMetallic.toFixed(2)}</div>
+            <div class="stat-line">Roughness: ${currentRoughness.toFixed(2)}</div>
+            <div class="stat-header">Phase 4 Features</div>
+            <div class="stat-line">PBR: ${backend.capabilities.supportsPBR ? '✓' : '✗'}</div>
+            <div class="stat-line">Shadows: ${backend.capabilities.supportsShadows ? '✓' : '✗'}</div>
+            <div class="stat-line">Point Lights: ${backend.capabilities.supportsPointLights ? '✓' : '✗'}</div>
+            <div class="stat-line">Spot Lights: ${backend.capabilities.supportsSpotLights ? '✓' : '✗'}</div>
+        `;
+    }
+
+    // Backend switching with canvas replacement
+    async function switchBackend(backendType) {
+        // Stop animation loop
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+
+        // Dispose old renderer
+        if (renderer) {
+            renderer.dispose();
+            renderer = null;
+        }
+
+        // Replace canvas to clear WebGPU context lock
+        const oldCanvas = canvas;
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = 'renderCanvas';
+        newCanvas.width = 800;
+        newCanvas.height = 600;
+        oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+        canvas = newCanvas;
+
+        // Update camera aspect ratio
+        camera.aspect = canvas.width / canvas.height;
+        camera.updateProjectionMatrix();
+
+        // Initialize new renderer
+        renderer = new BangBangRenderer({ canvas, backend: backendType });
+        await renderer.initialize();
+
+        // Restart animation loop
+        animate();
+    }
+
+    // Event handlers
+    document.getElementById('btn-cpu').addEventListener('click', async () => {
+        await switchBackend('cpu');
+        document.getElementById('btn-cpu').classList.add('active');
+        document.getElementById('btn-gpu').classList.remove('active');
+    });
+
+    document.getElementById('btn-gpu').addEventListener('click', async () => {
+        await switchBackend('gpu');
+        document.getElementById('btn-gpu').classList.add('active');
+        document.getElementById('btn-cpu').classList.remove('active');
+    });
+
+    document.getElementById('mat-basic').addEventListener('click', () => {
+        usePBR = false;
+        document.getElementById('mat-basic').classList.add('active');
+        document.getElementById('mat-pbr').classList.remove('active');
+        clearScene();
+        addSphere();
+        addCube();
+    });
+
+    document.getElementById('mat-pbr').addEventListener('click', () => {
+        usePBR = true;
+        document.getElementById('mat-pbr').classList.add('active');
+        document.getElementById('mat-basic').classList.remove('active');
+        clearScene();
+        addSphere();
+        addCube();
+    });
+
+    document.getElementById('btn-add-sphere').addEventListener('click', addSphere);
+    document.getElementById('btn-add-cube').addEventListener('click', addCube);
+    document.getElementById('btn-clear').addEventListener('click', clearScene);
+
+    document.getElementById('cb-rotate').addEventListener('change', (e) => {
+        rotating = e.target.checked;
+    });
+
+    document.getElementById('metallic-slider').addEventListener('input', (e) => {
+        currentMetallic = parseFloat(e.target.value);
+        document.getElementById('metallic-value').textContent = currentMetallic.toFixed(2);
+        updateMaterials();
+    });
+
+    document.getElementById('roughness-slider').addEventListener('input', (e) => {
+        currentRoughness = parseFloat(e.target.value);
+        document.getElementById('roughness-value').textContent = currentRoughness.toFixed(2);
+        updateMaterials();
+    });
+
+    // Start animation
+    animate();
+
+    console.log('[Phase4Test] Animation loop started');
+    console.log('[Phase4Test] Features:');
+    console.log('  - PBR Materials (Metallic/Roughness workflow)');
+    console.log('  - Point Lights with distance attenuation');
+    console.log('  - Spot Lights with cone falloff');
+    console.log('  - Shadow Map infrastructure (backend ready)');
+    console.log('  - Cook-Torrance BRDF');
+    console.log('  - Normal mapping support (infrastructure)');
+    console.log('  - Environment mapping support (infrastructure)');
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Debug Framework Import</title>
+</head>
+<body>
+  <h1>Debug Framework Import Test</h1>
+  <div id="output"></div>
+  
+  <script type="module">
+    const output = document.getElementById('output');
+    
+    async function testImport(path, name) {
+      try {
+        console.log(`Attempting to import ${path}...`);
+        const module = await import(path);
+        console.log(`SUCCESS! Imported ${name}:`, Object.keys(module));
+        return `<p style="color: green;">✓ ${name} imported! Exports: ${Object.keys(module).join(', ')}</p>`;
+      } catch (err) {
+        console.error(`FAILED to import ${name}:`, err);
+        return `<p style="color: red;">✗ ${name} failed: ${err.message}</p>`;
+      }
+    }
+    
+    (async () => {
+      let html = '';
+      
+      // Test 1: Import BangBangRenderer directly
+      html += await testImport('../src/renderer/BangBangRenderer.js', 'BangBangRenderer');
+      
+      // Test 2: Import Vec3 directly
+      html += await testImport('../src/math/Vec3.js', 'Vec3');
+      
+      // Test 3: Import Scene directly
+      html += await testImport('../src/core/Scene.js', 'Scene');
+      
+      // Test 4: Now try test-helpers.js
+      html += await testImport('./test-helpers.js', 'test-helpers');
+      
+      output.innerHTML = html;
+    })();
+  </script>
+</body>
+</html>

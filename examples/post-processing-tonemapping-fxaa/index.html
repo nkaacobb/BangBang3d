@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 3 Test - Render Graph and Post-Processing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        #controls {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 300px;
+            max-height: calc(100vh - 24px);
+            background: rgba(30, 30, 46, 0.95);
+            padding: 16px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 6px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .control-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(42, 42, 62, 0.6);
+            border-radius: 4px;
+            border-left: 3px solid #ff00ff;
+        }
+
+        .control-section h3 {
+            color: #00ffff;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 0 15px rgba(245, 87, 108, 0.5);
+        }
+
+        .slider-control {
+            margin-bottom: 10px;
+        }
+
+        .slider-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #00ffff;
+        }
+
+        .slider-control input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .slider-control input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #00ffff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-control .value {
+            color: #ff00ff;
+            font-weight: bold;
+        }
+
+        #stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #0f0;
+            min-width: 220px;
+            pointer-events: none;
+        }
+
+        #stats .stat-line {
+            margin: 2px 0;
+        }
+
+        #stats .stat-header {
+            color: #fff;
+            font-weight: bold;
+            margin-top: 8px;
+            margin-bottom: 4px;
+        }
+
+        .checkbox-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .checkbox-control input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .checkbox-control label {
+            font-size: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <div id="canvas-wrapper">
+        <canvas id="renderCanvas" width="800" height="600"></canvas>
+        <div id="stats"></div>
+    </div>
+
+    <div id="controls">
+        <div class="control-section">
+            <h3>Backend</h3>
+            <div class="button-group">
+                <button id="btn-cpu">CPU</button>
+                <button id="btn-gpu" class="active">GPU</button>
+                <button id="btn-auto">Auto</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Post-Processing</h3>
+            <div class="checkbox-control">
+                <input type="checkbox" id="cb-postprocessing" checked>
+                <label for="cb-postprocessing">Enable Post-Processing</label>
+            </div>
+            <div class="checkbox-control">
+                <input type="checkbox" id="cb-tonemapping" checked>
+                <label for="cb-tonemapping">Tone Mapping (ACES)</label>
+            </div>
+            <div class="checkbox-control">
+                <input type="checkbox" id="cb-gamma" checked>
+                <label for="cb-gamma">Gamma Correction</label>
+            </div>
+            <div class="checkbox-control">
+                <input type="checkbox" id="cb-fxaa" checked>
+                <label for="cb-fxaa">FXAA Anti-Aliasing</label>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Tone Mapping</h3>
+            <div class="button-group">
+                <button id="tm-linear">Linear</button>
+                <button id="tm-reinhard">Reinhard</button>
+                <button id="tm-aces" class="active">ACES</button>
+                <button id="tm-uncharted2">Uncharted2</button>
+            </div>
+            <div class="slider-control">
+                <label>Exposure: <span class="value" id="exposure-value">1.0</span></label>
+                <input type="range" id="exposure-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Scene</h3>
+            <div class="button-group">
+                <button id="btn-add-cube">Add Cube</button>
+                <button id="btn-add-sphere">Add Sphere</button>
+                <button id="btn-clear">Clear Scene</button>
+                <button id="btn-pause">Pause Rotation</button>
+            </div>
+            <div class="checkbox-control">
+                <input type="checkbox" id="cb-stats" checked>
+                <label for="cb-stats">Show Performance Stats</label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { BangBangRenderer } from '../../src/renderer/BangBangRenderer.js';
+    import { Scene } from '../../src/core/Scene.js';
+    import { PerspectiveCamera } from '../../src/core/PerspectiveCamera.js';
+    import { Mesh } from '../../src/core/Mesh.js';
+    import { BoxGeometry } from '../../src/geometry/BoxGeometry.js';
+    import { SphereGeometry } from '../../src/geometry/SphereGeometry.js';
+    import { BasicMaterial } from '../../src/materials/BasicMaterial.js';
+    import { Color } from '../../src/math/Color.js';
+    import RenderTarget from '../../src/renderer/resources/RenderTarget.js';
+    import PostProcessComposer from '../../src/renderer/postprocessing/PostProcessComposer.js';
+    import ToneMappingPass from '../../src/renderer/postprocessing/ToneMappingPass.js';
+    import GammaCorrectionPass from '../../src/renderer/postprocessing/GammaCorrectionPass.js';
+    import FXAAPass from '../../src/renderer/postprocessing/FXAAPass.js';
+    import Instrumentation from '../../src/renderer/debug/Instrumentation.js';
+
+    // Canvas and renderer
+    let canvas = document.getElementById('renderCanvas');
+    let renderer = new BangBangRenderer({ 
+        canvas, 
+        backend: 'gpu'
+    });
+    await renderer.initialize();
+
+    // Scene setup
+    const scene = new Scene();
+    scene.background = new Color(0.05, 0.05, 0.1);
+
+    const camera = new PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 100);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+
+    // Instrumentation
+    const instrumentation = new Instrumentation();
+
+    // Post-processing setup (Phase 3)
+    let composer = null;
+    let renderTarget = null;
+    let toneMappingPass = null;
+    let gammaCorrectionPass = null;
+    let fxaaPass = null;
+    let postProcessingEnabled = true;
+
+    function setupPostProcessing() {
+        if (!renderer.backend.capabilities.supportsPostProcessing) {
+            console.warn('Backend does not support post-processing');
+            return;
+        }
+
+        // Create render target for scene
+        renderTarget = new RenderTarget(canvas.width, canvas.height);
+        renderer.backend.setupRenderTarget(renderTarget);
+
+        // Create composer
+        composer = new PostProcessComposer(renderer, canvas.width, canvas.height);
+
+        // Create post-processing passes
+        toneMappingPass = new ToneMappingPass('aces');
+        toneMappingPass.setExposure(1.0);
+        renderer.backend.compilePostProcessPass(toneMappingPass);
+
+        gammaCorrectionPass = new GammaCorrectionPass(2.2);
+        renderer.backend.compilePostProcessPass(gammaCorrectionPass);
+
+        fxaaPass = new FXAAPass();
+        fxaaPass.resize(canvas.width, canvas.height);
+        renderer.backend.compilePostProcessPass(fxaaPass);
+
+        // Add passes to composer
+        composer.addPass(toneMappingPass);
+        composer.addPass(gammaCorrectionPass);
+        composer.addPass(fxaaPass);
+
+        console.log('[Phase3Test] Post-processing setup complete');
+    }
+
+    setupPostProcessing();
+
+    // Scene objects
+    const objects = [];
+    let paused = false;
+
+    function addCube() {
+        const geometry = new BoxGeometry(1, 1, 1);
+        const material = new BasicMaterial({
+            color: new Color(Math.random(), Math.random(), Math.random()),
+            transparent: Math.random() > 0.7,
+            opacity: Math.random() * 0.5 + 0.5
+        });
+        const mesh = new Mesh(geometry, material);
+
+        mesh.position.set(
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 4
+        );
+        mesh.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+
+        scene.add(mesh);
+        objects.push(mesh);
+    }
+
+    function addSphere() {
+        const geometry = new SphereGeometry(0.5, 16, 12);
+        const material = new BasicMaterial({
+            color: new Color(Math.random(), Math.random(), Math.random()),
+            transparent: Math.random() > 0.7,
+            opacity: Math.random() * 0.5 + 0.5
+        });
+        const mesh = new Mesh(geometry, material);
+
+        mesh.position.set(
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 4,
+            (Math.random() - 0.5) * 4
+        );
+
+        scene.add(mesh);
+        objects.push(mesh);
+    }
+
+    function clearScene() {
+        for (const obj of objects) {
+            scene.remove(obj);
+        }
+        objects.length = 0;
+    }
+
+    // Add initial objects
+    addCube();
+    addSphere();
+
+    // Animation loop
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+    let animationId = null;
+
+    function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - lastTime) / 1000;
+        lastTime = currentTime;
+
+        instrumentation.beginFrame();
+
+        // Rotate objects
+        if (!paused) {
+            for (const obj of objects) {
+                obj.rotation.x += deltaTime * 0.5;
+                obj.rotation.y += deltaTime * 0.7;
+            }
+        }
+
+        // Render scene
+        if (postProcessingEnabled && composer && renderTarget) {
+            // Phase 3: Render to texture, then post-process
+            // TODO: Implement render-to-texture in renderer
+            // For now, render normally
+            renderer.render(scene, camera);
+
+            // Apply post-processing (if supported)
+            if (renderer.backend.renderPostProcessPass) {
+                const sceneTexture = renderTarget.getColorTexture();
+                composer.setInputTexture(sceneTexture);
+                // composer.render(null); // Render to screen
+            }
+        } else {
+            // Direct render
+            renderer.render(scene, camera);
+        }
+
+        // Update stats
+        frameCount++;
+        if (frameCount % 10 === 0) {
+            fps = 1 / deltaTime;
+        }
+
+        instrumentation.endFrame();
+        updateStats();
+    }
+
+    function updateStats() {
+        const statsDiv = document.getElementById('stats');
+        if (!document.getElementById('cb-stats').checked) {
+            statsDiv.style.display = 'none';
+            return;
+        }
+        statsDiv.style.display = 'block';
+
+        const backend = renderer.backend;
+        const info = renderer.info.render;
+        const stats = instrumentation.getStats();
+
+        statsDiv.innerHTML = `
+            <div class="stat-header">BangBang3D Phase 3</div>
+            <div class="stat-line">Backend: ${backend.backendType}</div>
+            <div class="stat-line">API: ${backend.gpuAPI || 'cpu'}</div>
+            <div class="stat-line">FPS: <span style="color: ${fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0'}">${fps.toFixed(1)}</span></div>
+            <div class="stat-line">Frame Time: ${stats.frameTime.toFixed(2)}ms</div>
+            <div class="stat-header">Rendering</div>
+            <div class="stat-line">Draw Calls: ${stats.drawCalls || info.calls}</div>
+            <div class="stat-line">Triangles: ${info.triangles.toLocaleString()}</div>
+            <div class="stat-line">Objects: ${objects.length}</div>
+            <div class="stat-header">Post-Processing</div>
+            <div class="stat-line">Enabled: ${postProcessingEnabled ? 'Yes' : 'No'}</div>
+            <div class="stat-line">Active Passes: ${composer ? composer.passes.filter(p => p.enabled).length : 0}</div>
+            <div class="stat-line">Tone Mapping: ${toneMappingPass?.enabled ? toneMappingPass.operator : 'Off'}</div>
+            <div class="stat-line">Exposure: ${toneMappingPass?.exposure.toFixed(2) || 1.0}</div>
+        `;
+    }
+
+    // Backend switching with canvas replacement
+    async function switchBackend(backendType) {
+        // Stop animation loop
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+        }
+
+        // Dispose old renderer
+        if (renderer) {
+            renderer.dispose();
+            renderer = null;
+        }
+
+        // Replace canvas to clear WebGPU context lock
+        const oldCanvas = canvas;
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = 'renderCanvas';
+        newCanvas.width = 800;
+        newCanvas.height = 600;
+        oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+        canvas = newCanvas;
+
+        // Update camera aspect ratio
+        camera.aspect = canvas.width / canvas.height;
+        camera.updateProjectionMatrix();
+
+        // Initialize new renderer
+        renderer = new BangBangRenderer({ canvas, backend: backendType });
+        await renderer.initialize();
+
+        // Setup post-processing for GPU backends
+        if (backendType === 'gpu' || backendType === 'auto') {
+            setupPostProcessing();
+        }
+
+        updateButtonStates(backendType);
+
+        // Restart animation loop
+        animate();
+    }
+
+    // Event handlers
+    document.getElementById('btn-cpu').addEventListener('click', async () => {
+        await switchBackend('cpu');
+    });
+
+    document.getElementById('btn-gpu').addEventListener('click', async () => {
+        await switchBackend('gpu');
+    });
+
+    document.getElementById('btn-auto').addEventListener('click', async () => {
+        await switchBackend('auto');
+    });
+
+    document.getElementById('btn-add-cube').addEventListener('click', addCube);
+    document.getElementById('btn-add-sphere').addEventListener('click', addSphere);
+    document.getElementById('btn-clear').addEventListener('click', clearScene);
+    document.getElementById('btn-pause').addEventListener('click', () => {
+        paused = !paused;
+        document.getElementById('btn-pause').textContent = paused ? 'Resume Rotation' : 'Pause Rotation';
+    });
+
+    document.getElementById('cb-postprocessing').addEventListener('change', (e) => {
+        postProcessingEnabled = e.target.checked;
+    });
+
+    document.getElementById('cb-tonemapping').addEventListener('change', (e) => {
+        if (toneMappingPass) toneMappingPass.enabled = e.target.checked;
+    });
+
+    document.getElementById('cb-gamma').addEventListener('change', (e) => {
+        if (gammaCorrectionPass) gammaCorrectionPass.enabled = e.target.checked;
+    });
+
+    document.getElementById('cb-fxaa').addEventListener('change', (e) => {
+        if (fxaaPass) fxaaPass.enabled = e.target.checked;
+    });
+
+    document.getElementById('tm-linear').addEventListener('click', () => {
+        if (toneMappingPass) toneMappingPass.setOperator('linear');
+        updateToneMappingButtons('linear');
+    });
+
+    document.getElementById('tm-reinhard').addEventListener('click', () => {
+        if (toneMappingPass) toneMappingPass.setOperator('reinhard');
+        updateToneMappingButtons('reinhard');
+    });
+
+    document.getElementById('tm-aces').addEventListener('click', () => {
+        if (toneMappingPass) toneMappingPass.setOperator('aces');
+        updateToneMappingButtons('aces');
+    });
+
+    document.getElementById('tm-uncharted2').addEventListener('click', () => {
+        if (toneMappingPass) toneMappingPass.setOperator('uncharted2');
+        updateToneMappingButtons('uncharted2');
+    });
+
+    document.getElementById('exposure-slider').addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        document.getElementById('exposure-value').textContent = value.toFixed(1);
+        if (toneMappingPass) toneMappingPass.setExposure(value);
+    });
+
+    function updateButtonStates(active) {
+        document.getElementById('btn-cpu').classList.toggle('active', active === 'cpu');
+        document.getElementById('btn-gpu').classList.toggle('active', active === 'gpu');
+        document.getElementById('btn-auto').classList.toggle('active', active === 'auto');
+    }
+
+    function updateToneMappingButtons(active) {
+        document.getElementById('tm-linear').classList.toggle('active', active === 'linear');
+        document.getElementById('tm-reinhard').classList.toggle('active', active === 'reinhard');
+        document.getElementById('tm-aces').classList.toggle('active', active === 'aces');
+        document.getElementById('tm-uncharted2').classList.toggle('active', active === 'uncharted2');
+    }
+
+    // Start animation
+    animate();
+
+    console.log('[Phase3Test] Test initialized successfully');
+    console.log('Features: Render Graph, Post-Processing, Instrumentation');
+</script>
+</body>
+</html>

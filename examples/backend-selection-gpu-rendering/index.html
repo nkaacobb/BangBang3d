@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3D Phase 2 Test - GPU Rendering</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      overflow: hidden;
+    }
+
+    #container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      margin: 0;
+      font-size: 20px;
+      color: #58a6ff;
+      z-index: 10;
+    }
+
+    #controls {
+      position: absolute;
+      right: 12px;
+      top: 50px;
+      width: 280px;
+      max-height: calc(100vh - 62px);
+      background: rgba(22, 27, 34, 0.95);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 6px;
+      padding: 12px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    #controls h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #58a6ff;
+      border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+      padding-bottom: 6px;
+    }
+
+    button {
+      width: 100%;
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      margin: 4px 0;
+    }
+
+    button:hover {
+      background: #2ea043;
+    }
+
+    button.active {
+      background: #1f6feb;
+      border-color: #388bfd;
+    }
+
+    #canvas {
+      border: 2px solid #58a6ff;
+      box-shadow: 0 0 20px rgba(88, 166, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    #info {
+      position: absolute;
+      left: 12px;
+      top: 50px;
+      width: 280px;
+      background: rgba(22, 27, 34, 0.95);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    #info h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #58a6ff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      border-bottom: 1px solid rgba(88, 166, 255, 0.2);
+      padding-bottom: 6px;
+    }
+
+    .success {
+      color: #3fb950;
+    }
+
+    .error {
+      color: #f85149;
+    }
+
+    .label {
+      color: #8b949e;
+      min-width: 100px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>BangBang3D Phase 2 - GPU Rendering Test</h1>
+    
+    <canvas id="canvas" width="800" height="600"></canvas>
+    
+    <div id="info">
+      <h3>Runtime Stats</h3>
+      <div><span class="label">Backend:</span> <span id="infoBackend">-</span></div>
+      <div><span class="label">API:</span> <span id="infoAPI">-</span></div>
+      <div><span class="label">Frame:</span> <span id="infoFrame">-</span></div>
+      <div><span class="label">Triangles:</span> <span id="infoTriangles">-</span></div>
+      <div><span class="label">Objects:</span> <span id="infoObjects">-</span></div>
+      <div><span class="label">FPS:</span> <span id="infoFPS">-</span></div>
+      <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(88, 166, 255, 0.2);">
+        <div><span class="label">Shaders:</span> <span class="success">✓ Supported</span></div>
+        <div><span class="label">Textures:</span> <span class="success">✓ Supported</span></div>
+        <div><span class="label">Transparency:</span> <span class="success">✓ Supported</span></div>
+      </div>
+    </div>
+    
+    <div id="controls">
+      <h3>Backend Selection</h3>
+      <button id="btnCPU">CPU Backend</button>
+      <button id="btnGPU" class="active">GPU Backend</button>
+      <button id="btnAuto">Auto Select</button>
+      
+      <h3 style="margin-top: 16px;">Scene Controls</h3>
+      <button id="btnAddCube">Add Cube</button>
+      <button id="btnAddSphere">Add Sphere</button>
+      <button id="btnClear">Clear Scene</button>
+      <button id="btnToggleRotation">Pause</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      Scene, Mesh, BoxGeometry, SphereGeometry, BasicMaterial,
+      PerspectiveCamera, BangBangRenderer, Vector3, Color
+    } from '../../src/index.js';
+
+    let canvas = document.getElementById('canvas');
+    const infoBackend = document.getElementById('infoBackend');
+    const infoAPI = document.getElementById('infoAPI');
+    const infoFrame = document.getElementById('infoFrame');
+    const infoTriangles = document.getElementById('infoTriangles');
+    const infoObjects = document.getElementById('infoObjects');
+    const infoFPS = document.getElementById('infoFPS');
+
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let objects = [];
+    let animationId = null;
+    let isRotating = true;
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let fps = 0;
+
+    // Initialize scene
+    function createScene() {
+      scene = new Scene();
+      scene.background = new Color(0.08, 0.0941, 0.1058); // #141720
+
+      camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 100);
+      camera.position.set(0, 2, 8);
+      camera.lookAt(new Vector3(0, 0, 0));
+
+      objects = [];
+
+      // Add initial objects
+      addCube();
+      addSphere();
+    }
+
+    // Add a cube
+    function addCube() {
+      const colors = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf7b731, 0x5f27cd, 0x00d2d3];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      const cube = new Mesh(
+        new BoxGeometry(1, 1, 1),
+        new BasicMaterial({ 
+          color: color,
+          transparent: Math.random() > 0.7,
+          opacity: Math.random() > 0.7 ? 0.6 : 1.0
+        })
+      );
+      
+      cube.position.set(
+        (Math.random() - 0.5) * 6,
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 6
+      );
+      
+      cube.userData.rotationSpeed = {
+        x: (Math.random() - 0.5) * 0.02,
+        y: (Math.random() - 0.5) * 0.02,
+        z: (Math.random() - 0.5) * 0.02
+      };
+
+      scene.add(cube);
+      objects.push(cube);
+    }
+
+    // Add a sphere
+    function addSphere() {
+      const colors = [0x00b894, 0x6c5ce7, 0xfdcb6e, 0xe17055, 0x74b9ff, 0xfd79a8];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      const sphere = new Mesh(
+        new SphereGeometry(0.6, 16, 12),
+        new BasicMaterial({ 
+          color: color,
+          transparent: Math.random() > 0.7,
+          opacity: Math.random() > 0.7 ? 0.5 : 1.0
+        })
+      );
+      
+      sphere.position.set(
+        (Math.random() - 0.5) * 6,
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 6
+      );
+      
+      sphere.userData.rotationSpeed = {
+        x: (Math.random() - 0.5) * 0.02,
+        y: (Math.random() - 0.5) * 0.02,
+        z: (Math.random() - 0.5) * 0.02
+      };
+
+      scene.add(sphere);
+      objects.push(sphere);
+    }
+
+    // Clear scene
+    function clearScene() {
+      for (const obj of objects) {
+        scene.remove(obj);
+      }
+      objects = [];
+    }
+
+    // Initialize renderer with backend
+    async function initRenderer(backendType) {
+      // Stop animation loop
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+
+      if (renderer) {
+        renderer.dispose();
+        renderer = null;
+      }
+
+      // Replace canvas to clear WebGPU context lock
+      const oldCanvas = canvas;
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      newCanvas.width = 800;
+      newCanvas.height = 600;
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      canvas = newCanvas;
+
+      // Update camera aspect ratio for new canvas
+      if (camera) {
+        camera.aspect = canvas.width / canvas.height;
+        camera.updateProjectionMatrix();
+      }
+
+      console.log(`Initializing ${backendType} backend...`);
+
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: 800,
+        height: 600,
+        pixelRatio: 1,
+        backend: backendType
+      });
+
+      await renderer.initialize();
+
+      if (renderer.isReady()) {
+        console.log(`Backend ready: ${renderer.backendType}`);
+        updateInfo();
+        // Always restart animation loop
+        animate();
+      } else {
+        console.error('Renderer failed to initialize');
+      }
+    }
+
+    // Update info display
+    function updateInfo() {
+      if (!renderer) return;
+
+      const debugInfo = renderer.getDebugInfo();
+      
+      infoBackend.textContent = renderer.backendType;
+      infoAPI.textContent = renderer.backendType.includes('webgpu') ? 'WebGPU' :
+                            renderer.backendType.includes('webgl2') ? 'WebGL2' : 'CPU';
+      infoFrame.textContent = debugInfo.frame;
+      infoTriangles.textContent = debugInfo.triangles;
+      infoObjects.textContent = objects.length;
+      infoFPS.textContent = fps.toFixed(1);
+    }
+
+    // Animation loop
+    function animate() {
+      if (!renderer || !renderer.isReady()) {
+        return;
+      }
+
+      // Calculate FPS
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = now;
+      }
+
+      // Rotate objects
+      if (isRotating) {
+        for (const obj of objects) {
+          if (obj.userData.rotationSpeed) {
+            obj.rotation.x += obj.userData.rotationSpeed.x;
+            obj.rotation.y += obj.userData.rotationSpeed.y;
+            obj.rotation.z += obj.userData.rotationSpeed.z;
+          }
+        }
+      }
+
+      // Render
+      renderer.render(scene, camera);
+
+      // Update info
+      updateInfo();
+
+      animationId = requestAnimationFrame(animate);
+    }
+
+    // Button handlers
+    document.getElementById('btnCPU').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnCPU').classList.add('active');
+      await initRenderer('cpu');
+    });
+
+    document.getElementById('btnGPU').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnGPU').classList.add('active');
+      await initRenderer('gpu');
+    });
+
+    document.getElementById('btnAuto').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnAuto').classList.add('active');
+      await initRenderer('auto');
+    });
+
+    document.getElementById('btnAddCube').addEventListener('click', () => {
+      addCube();
+    });
+
+    document.getElementById('btnAddSphere').addEventListener('click', () => {
+      addSphere();
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+      clearScene();
+    });
+
+    document.getElementById('btnToggleRotation').addEventListener('click', (e) => {
+      isRotating = !isRotating;
+      e.target.textContent = isRotating ? 'Pause' : 'Resume';
+    });
+
+    // Initialize
+    createScene();
+    initRenderer('gpu'); // Start with GPU by default
+  </script>
+</body>
+</html>

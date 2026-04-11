@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 5 - Reflections Playground</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            border: 2px solid #00ffaa;
+            box-shadow: 0 0 30px rgba(0, 255, 170, 0.4);
+            border-radius: 4px;
+        }
+
+        #controls {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 310px;
+            max-height: calc(100vh - 24px);
+            background: rgba(15, 15, 30, 0.95);
+            padding: 16px;
+            border: 1px solid rgba(0, 255, 170, 0.3);
+            border-radius: 6px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .control-section {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(26, 26, 46, 0.7);
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+
+        .control-section h3 {
+            color: #00ffaa;
+            margin-bottom: 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            box-shadow: 0 0 15px rgba(250, 112, 154, 0.5);
+        }
+
+        .slider-control {
+            margin-bottom: 8px;
+        }
+
+        .slider-control label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 11px;
+            color: #00ffaa;
+        }
+
+        .slider-control input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00ffaa;
+            cursor: pointer;
+        }
+
+        #status-bar {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(15, 15, 30, 0.9);
+            padding: 8px 14px;
+            border-radius: 4px;
+            font-size: 11px;
+            border: 1px solid rgba(0, 255, 170, 0.3);
+        }
+
+        #status-bar span {
+            margin-right: 16px;
+        }
+
+        .status-label {
+            color: #00ffaa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-ok { background: #00cc88; color: #000; }
+        .badge-na { background: #ff6666; color: #000; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-wrapper"></div>
+
+        <div id="controls">
+            <h2 style="color:#00ffaa; margin-bottom:12px; font-size:15px; letter-spacing:1.5px;">
+                REFLECTIONS PLAYGROUND
+            </h2>
+
+            <!-- Backend -->
+            <div class="control-section">
+                <h3>Backend</h3>
+                <div class="button-group" id="backend-buttons">
+                    <button id="btn-webgl2" class="active">WebGL2</button>
+                    <button id="btn-webgpu">WebGPU</button>
+                </div>
+                <div id="backend-info" style="font-size:10px; color:#888;"></div>
+            </div>
+
+            <!-- Environment -->
+            <div class="control-section" style="border-left-color: #ff6b6b;">
+                <h3>Environment Map</h3>
+                <div class="button-group" id="env-buttons">
+                    <button id="btn-env-sky" class="active">Sky</button>
+                    <button id="btn-env-studio">Studio</button>
+                    <button id="btn-env-sunset">Sunset</button>
+                    <button id="btn-env-none">None</button>
+                </div>
+                <div class="slider-control">
+                    <label>Env Intensity: <span id="env-intensity-val">1.0</span></label>
+                    <input type="range" id="env-intensity" min="0" max="3" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <!-- Material Presets -->
+            <div class="control-section" style="border-left-color: #ffd93d;">
+                <h3>Material Preset</h3>
+                <div class="button-group" id="preset-buttons">
+                    <button id="btn-chrome" class="active">Chrome</button>
+                    <button id="btn-brushed">Brushed Metal</button>
+                    <button id="btn-gold">Gold</button>
+                    <button id="btn-plastic">Plastic</button>
+                    <button id="btn-rubber">Rubber</button>
+                </div>
+            </div>
+
+            <!-- PBR Controls -->
+            <div class="control-section" style="border-left-color: #6bcb77;">
+                <h3>PBR Parameters</h3>
+                <div class="slider-control">
+                    <label>Metallic: <span id="metallic-val">1.0</span></label>
+                    <input type="range" id="metallic" min="0" max="1" step="0.01" value="1.0">
+                </div>
+                <div class="slider-control">
+                    <label>Roughness: <span id="roughness-val">0.05</span></label>
+                    <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.05">
+                </div>
+                <div class="slider-control">
+                    <label>Env Map Intensity: <span id="mat-env-val">1.0</span></label>
+                    <input type="range" id="mat-env-intensity" min="0" max="3" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <!-- Scene Objects -->
+            <div class="control-section" style="border-left-color: #4d96ff;">
+                <h3>Scene Object</h3>
+                <div class="button-group" id="object-buttons">
+                    <button id="btn-sphere" class="active">Sphere</button>
+                    <button id="btn-cube">Cube</button>
+                    <button id="btn-multi">Multi</button>
+                </div>
+            </div>
+
+            <!-- Capabilities -->
+            <div class="control-section" style="border-left-color: #888;">
+                <h3>Capabilities</h3>
+                <div id="caps-info" style="font-size:11px; line-height:1.8;"></div>
+            </div>
+        </div>
+
+        <div id="status-bar">
+            <span><span class="status-label">Backend:</span> <span id="st-backend">-</span></span>
+            <span><span class="status-label">IBL:</span> <span id="st-ibl">-</span></span>
+            <span><span class="status-label">FPS:</span> <span id="st-fps">-</span></span>
+        </div>
+    </div>
+
+    <script type="module">
+    import { BangBangRenderer } from '../../src/renderer/BangBangRenderer.js';
+    import { Scene } from '../../src/core/Scene.js';
+    import { PerspectiveCamera } from '../../src/core/PerspectiveCamera.js';
+    import { Mesh } from '../../src/core/Mesh.js';
+    import { BoxGeometry } from '../../src/geometry/BoxGeometry.js';
+    import { SphereGeometry } from '../../src/geometry/SphereGeometry.js';
+    import { PlaneGeometry } from '../../src/geometry/PlaneGeometry.js';
+    import { PBRMaterial } from '../../src/materials/PBRMaterial.js';
+    import { BasicMaterial } from '../../src/materials/BasicMaterial.js';
+    import { DirectionalLight } from '../../src/lights/DirectionalLight.js';
+    import { AmbientLight } from '../../src/lights/AmbientLight.js';
+    import { PointLight } from '../../src/lights/PointLight.js';
+    import { Color } from '../../src/math/Color.js';
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+    import { CubeTexture } from '../../src/resources/CubeTexture.js';
+    import { PMREMGenerator } from '../../src/renderer/ibl/PMREMGenerator.js';
+
+    // =========================================================================
+    //  State
+    // =========================================================================
+    let renderer, scene, camera, controls;
+    let mainMesh, floorMesh;
+    let currentBackend = 'webgl2';
+    let currentEnv = 'sky';
+    let currentPreset = 'chrome';
+    let currentObject = 'sphere';
+    let frameCount = 0, lastTime = performance.now();
+
+    // Presets: { metallic, roughness, color }
+    const PRESETS = {
+      chrome:  { metallic: 1.0, roughness: 0.05, color: { r: 0.95, g: 0.95, b: 0.95 } },
+      brushed: { metallic: 1.0, roughness: 0.35, color: { r: 0.8,  g: 0.8,  b: 0.85 } },
+      gold:    { metallic: 1.0, roughness: 0.15, color: { r: 1.0,  g: 0.84, b: 0.0  } },
+      plastic: { metallic: 0.0, roughness: 0.4,  color: { r: 0.8,  g: 0.1,  b: 0.1  } },
+      rubber:  { metallic: 0.0, roughness: 0.9,  color: { r: 0.15, g: 0.15, b: 0.15 } },
+    };
+
+    // =========================================================================
+    //  Procedural Cubemap Generation
+    // =========================================================================
+    /**
+     * Generate a procedural 6-face cubemap as an array of HTMLCanvasElement.
+     * Each face is size x size. The type determines the colours:
+     *   'sky'    – gradient sky with bright ground
+     *   'studio' – soft grey studio HDR approximation
+     *   'sunset' – warm orange/purple sunset
+     */
+    function generateProceduralCubeFaces(type, size = 128) {
+      // Face order: +X, -X, +Y, -Y, +Z, -Z
+      const faces = [];
+      for (let f = 0; f < 6; f++) {
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+
+        if (type === 'sky') {
+          // Top face = bright sky, bottom = ground, sides = gradient
+          const grad = ctx.createLinearGradient(0, 0, 0, size);
+          if (f === 2) { // +Y (top)
+            grad.addColorStop(0, '#4488ff');
+            grad.addColorStop(1, '#66aaff');
+          } else if (f === 3) { // -Y (bottom)
+            grad.addColorStop(0, '#445533');
+            grad.addColorStop(1, '#223311');
+          } else { // sides
+            grad.addColorStop(0, '#6699ee');
+            grad.addColorStop(0.5, '#aaccff');
+            grad.addColorStop(1, '#445533');
+          }
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, size, size);
+        } else if (type === 'studio') {
+          const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.7);
+          if (f === 2) { // top: bright panel
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(1, '#888888');
+          } else if (f === 3) { // bottom: dark floor
+            grad.addColorStop(0, '#444444');
+            grad.addColorStop(1, '#222222');
+          } else {
+            grad.addColorStop(0, '#999999');
+            grad.addColorStop(1, '#333333');
+          }
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, size, size);
+        } else if (type === 'sunset') {
+          const grad = ctx.createLinearGradient(0, 0, 0, size);
+          if (f === 2) { // top
+            grad.addColorStop(0, '#110033');
+            grad.addColorStop(1, '#553388');
+          } else if (f === 3) { // bottom
+            grad.addColorStop(0, '#332200');
+            grad.addColorStop(1, '#111100');
+          } else {
+            grad.addColorStop(0, '#553388');
+            grad.addColorStop(0.3, '#ff6633');
+            grad.addColorStop(0.6, '#ffaa33');
+            grad.addColorStop(1, '#332200');
+          }
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, size, size);
+        }
+        faces.push(c);
+      }
+      return faces;
+    }
+
+    function buildCubeTexture(envType) {
+      if (envType === 'none') return null;
+      const faces = generateProceduralCubeFaces(envType, 128);
+      const cube = new CubeTexture();
+      cube.setImages(faces);
+      cube.name = envType + '_env';
+      return cube;
+    }
+
+    // =========================================================================
+    //  Init
+    // =========================================================================
+    async function init(backend) {
+      const wrapper = document.getElementById('canvas-wrapper');
+      wrapper.innerHTML = '';
+
+      // Create a canvas element — BangBangRenderer requires one
+      const canvas = document.createElement('canvas');
+      canvas.width = wrapper.clientWidth || 800;
+      canvas.height = wrapper.clientHeight || 600;
+      wrapper.appendChild(canvas);
+
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: canvas.width,
+        height: canvas.height,
+        backend: backend
+      });
+
+      await renderer.initialize();
+
+      // Scene
+      scene = new Scene();
+      scene.background = new Color(0.05, 0.05, 0.08);
+
+      // Camera
+      camera = new PerspectiveCamera(55, canvas.width / canvas.height, 0.1, 200);
+      camera.position.set(0, 2, 5);
+      camera.lookAt(0, 0, 0);
+
+      // Controls
+      controls = new OrbitControls(camera, canvas);
+
+      // Lights
+      const ambient = new AmbientLight(new Color(1, 1, 1), 0.3);
+      scene.add(ambient);
+
+      const dirLight = new DirectionalLight(new Color(1, 1, 1), 1.0);
+      dirLight.position.set(5, 8, 4);
+      scene.add(dirLight);
+
+      const pointLight = new PointLight(new Color(0.6, 0.8, 1.0), 0.5, 20);
+      pointLight.position.set(-3, 3, 2);
+      scene.add(pointLight);
+
+      // Floor
+      const floorMat = new PBRMaterial({
+        color: new Color(0.3, 0.3, 0.3),
+        metallic: 0.0,
+        roughness: 0.7
+      });
+      floorMesh = new Mesh(new PlaneGeometry(10, 10), floorMat);
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.position.y = -1.2;
+      scene.add(floorMesh);
+
+      // Main object
+      buildMainObject();
+
+      // Environment
+      applyEnvironment();
+
+      // Update UI
+      updateBackendInfo();
+      updateCapabilities();
+
+      // Start
+      animate();
+    }
+
+    function buildMainObject() {
+      if (mainMesh) {
+        // Remove existing
+        if (Array.isArray(mainMesh)) {
+          mainMesh.forEach(m => scene.remove(m));
+        } else {
+          scene.remove(mainMesh);
+        }
+      }
+
+      const preset = PRESETS[currentPreset];
+      const mat = new PBRMaterial({
+        color: new Color(preset.color.r, preset.color.g, preset.color.b),
+        metallic: preset.metallic,
+        roughness: preset.roughness,
+        envMapIntensity: parseFloat(document.getElementById('mat-env-intensity').value)
+      });
+
+      if (currentObject === 'sphere') {
+        mainMesh = new Mesh(new SphereGeometry(1.2, 48, 48), mat);
+        scene.add(mainMesh);
+      } else if (currentObject === 'cube') {
+        mainMesh = new Mesh(new BoxGeometry(2, 2, 2), mat);
+        scene.add(mainMesh);
+      } else if (currentObject === 'multi') {
+        // Multiple spheres at different roughness
+        mainMesh = [];
+        for (let i = 0; i < 5; i++) {
+          const r = i / 4; // 0 .. 1
+          const m = new PBRMaterial({
+            color: new Color(preset.color.r, preset.color.g, preset.color.b),
+            metallic: preset.metallic,
+            roughness: r,
+            envMapIntensity: parseFloat(document.getElementById('mat-env-intensity').value)
+          });
+          const sphere = new Mesh(new SphereGeometry(0.6, 32, 32), m);
+          sphere.position.x = (i - 2) * 1.6;
+          scene.add(sphere);
+          mainMesh.push(sphere);
+        }
+      }
+
+      // Sync sliders to preset
+      document.getElementById('metallic').value = preset.metallic;
+      document.getElementById('metallic-val').textContent = preset.metallic.toFixed(2);
+      document.getElementById('roughness').value = preset.roughness;
+      document.getElementById('roughness-val').textContent = preset.roughness.toFixed(2);
+    }
+
+    function applyEnvironment() {
+      const cube = buildCubeTexture(currentEnv);
+      scene.environment = cube;
+      scene.environmentIntensity = parseFloat(document.getElementById('env-intensity').value);
+
+      document.getElementById('st-ibl').innerHTML = cube
+        ? '<span class="badge badge-ok">Active</span>'
+        : '<span class="badge badge-na">Off</span>';
+    }
+
+    function updateMaterialParams() {
+      const metallic = parseFloat(document.getElementById('metallic').value);
+      const roughness = parseFloat(document.getElementById('roughness').value);
+      const envInt = parseFloat(document.getElementById('mat-env-intensity').value);
+
+      document.getElementById('metallic-val').textContent = metallic.toFixed(2);
+      document.getElementById('roughness-val').textContent = roughness.toFixed(2);
+      document.getElementById('mat-env-val').textContent = envInt.toFixed(1);
+
+      if (!mainMesh) return;
+      const meshes = Array.isArray(mainMesh) ? mainMesh : [mainMesh];
+      meshes.forEach(m => {
+        m.material.metallic = metallic;
+        m.material.roughness = roughness;
+        m.material.envMapIntensity = envInt;
+      });
+    }
+
+    function updateBackendInfo() {
+      const api = renderer.getBackendType ? renderer.getBackendType() : currentBackend;
+      document.getElementById('st-backend').textContent = api;
+      document.getElementById('backend-info').textContent = 'Active: ' + api;
+    }
+
+    function updateCapabilities() {
+      const caps = renderer.capabilities || {};
+      const html = [
+        `Reflections: ${caps.supportsReflections ? '<span class="badge badge-ok">Yes</span>' : '<span class="badge badge-na">No</span>'}`,
+        `IBL: ${caps.supportsIBL ? '<span class="badge badge-ok">Yes</span>' : '<span class="badge badge-na">No</span>'}`,
+        `Cubemaps: ${caps.supportsCubemaps ? '<span class="badge badge-ok">Yes</span>' : '<span class="badge badge-na">No</span>'}`,
+        `PBR: ${caps.supportsPBR ? '<span class="badge badge-ok">Yes</span>' : '<span class="badge badge-na">No</span>'}`,
+        `Shadows: ${caps.supportsShadows ? '<span class="badge badge-ok">Yes</span>' : '<span class="badge badge-na">No</span>'}`,
+      ].join('<br>');
+      document.getElementById('caps-info').innerHTML = html;
+    }
+
+    // =========================================================================
+    //  Animation Loop
+    // =========================================================================
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Rotate main object gently
+      if (mainMesh) {
+        if (Array.isArray(mainMesh)) {
+          mainMesh.forEach(m => { m.rotation.y += 0.003; });
+        } else {
+          mainMesh.rotation.y += 0.005;
+        }
+      }
+
+      if (controls) controls.update();
+
+      renderer.render(scene, camera);
+
+      // FPS counter
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        document.getElementById('st-fps').textContent = frameCount;
+        frameCount = 0;
+        lastTime = now;
+      }
+    }
+
+    // =========================================================================
+    //  UI Wiring
+    // =========================================================================
+    function setActiveButton(groupId, activeId) {
+      document.querySelectorAll(`#${groupId} button`).forEach(b => b.classList.remove('active'));
+      document.getElementById(activeId).classList.add('active');
+    }
+
+    // Backend switching
+    document.getElementById('btn-webgl2').addEventListener('click', async () => {
+      if (currentBackend === 'webgl2') return;
+      currentBackend = 'webgl2';
+      setActiveButton('backend-buttons', 'btn-webgl2');
+      await init('webgl2');
+    });
+    document.getElementById('btn-webgpu').addEventListener('click', async () => {
+      if (currentBackend === 'webgpu') return;
+      currentBackend = 'webgpu';
+      setActiveButton('backend-buttons', 'btn-webgpu');
+      await init('webgpu');
+    });
+
+    // Environment switching
+    ['sky', 'studio', 'sunset', 'none'].forEach(env => {
+      document.getElementById('btn-env-' + env).addEventListener('click', () => {
+        currentEnv = env;
+        setActiveButton('env-buttons', 'btn-env-' + env);
+        applyEnvironment();
+      });
+    });
+
+    document.getElementById('env-intensity').addEventListener('input', (e) => {
+      document.getElementById('env-intensity-val').textContent = parseFloat(e.target.value).toFixed(1);
+      scene.environmentIntensity = parseFloat(e.target.value);
+    });
+
+    // Presets
+    ['chrome', 'brushed', 'gold', 'plastic', 'rubber'].forEach(preset => {
+      document.getElementById('btn-' + preset).addEventListener('click', () => {
+        currentPreset = preset;
+        setActiveButton('preset-buttons', 'btn-' + preset);
+        buildMainObject();
+      });
+    });
+
+    // Object switching
+    ['sphere', 'cube', 'multi'].forEach(obj => {
+      document.getElementById('btn-' + obj).addEventListener('click', () => {
+        currentObject = obj;
+        setActiveButton('object-buttons', 'btn-' + obj);
+        buildMainObject();
+      });
+    });
+
+    // PBR parameter sliders
+    document.getElementById('metallic').addEventListener('input', updateMaterialParams);
+    document.getElementById('roughness').addEventListener('input', updateMaterialParams);
+    document.getElementById('mat-env-intensity').addEventListener('input', updateMaterialParams);
+
+    // =========================================================================
+    //  Bootstrap
+    // =========================================================================
+    init(currentBackend);
+    </script>
+</body>
+</html>

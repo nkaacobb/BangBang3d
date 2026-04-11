@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Path Tracer - BangBang3D</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117; color: #c9d1d9; overflow: hidden;
+    }
+    canvas { display: block; }
+
+    #ui {
+      position: absolute; top: 10px; left: 10px; width: 290px;
+      background: rgba(0,0,0,0.92); border: 1px solid rgba(88,166,255,0.3);
+      border-radius: 8px; padding: 14px; font-size: 13px;
+      backdrop-filter: blur(10px);
+      max-height: calc(100vh - 20px); overflow-y: auto;
+    }
+    h2 { font-size: 16px; color: #58a6ff; margin-bottom: 8px; }
+    h3 {
+      font-size: 11px; color: #7ee787; margin: 10px 0 4px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-top: 1px solid rgba(88,166,255,0.12); padding-top: 8px;
+    }
+    .row { margin: 4px 0; display: flex; align-items: center; gap: 6px; }
+    .row label { flex: 0 0 115px; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row span { width: 40px; text-align: right; font-size: 11px; color: #8b949e; }
+    select {
+      background: #161b22; color: #c9d1d9; border: 1px solid #30363d;
+      border-radius: 3px; padding: 3px 6px; font-size: 12px; flex: 1;
+    }
+    button {
+      background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.3);
+      color: #c9d1d9; padding: 6px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 12px; margin: 2px;
+    }
+    button:hover { background: rgba(88,166,255,0.25); }
+    button.active { background: rgba(88,166,255,0.4); border-color: #58a6ff; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+
+    #stats {
+      margin-top: 10px; font-size: 11px; color: #8b949e; line-height: 1.7;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+    #status-bar {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.8); padding: 6px 14px;
+      font-size: 11px; color: #8b949e;
+      display: flex; justify-content: space-between;
+    }
+    .status-item { display: flex; gap: 6px; align-items: center; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot.green { background: #7ee787; }
+    .dot.yellow { background: #f0c040; }
+    .dot.red { background: #f85149; }
+
+    #error-banner {
+      display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(248,81,73,0.15); border: 1px solid #f85149;
+      border-radius: 8px; padding: 24px; text-align: center; max-width: 500px;
+    }
+    #error-banner h2 { color: #f85149; }
+    #error-banner p { margin: 8px 0; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="ui">
+    <h2>🔆 Path Tracer</h2>
+
+    <h3>Scene</h3>
+    <div class="btn-row">
+      <button id="btnCornell" class="active">Cornell Box</button>
+      <button id="btnPBR">PBR Balls</button>
+      <button id="btnCustom">Custom OBJ</button>
+    </div>
+    <input type="file" id="objInput" accept=".obj,.gltf,.glb" style="display:none;">
+
+    <h3>Rendering</h3>
+    <div class="row">
+      <label>Samples/Frame</label>
+      <input type="range" id="samplesPerFrame" min="1" max="8" value="1" step="1">
+      <span id="samplesPerFrameVal">1</span>
+    </div>
+    <div class="row">
+      <label>Max Bounces</label>
+      <input type="range" id="maxBounces" min="1" max="16" value="6" step="1">
+      <span id="maxBouncesVal">6</span>
+    </div>
+    <div class="row">
+      <label>RR Depth</label>
+      <input type="range" id="rrDepth" min="1" max="8" value="3" step="1">
+      <span id="rrDepthVal">3</span>
+    </div>
+    <div class="row">
+      <label>Clamp Luminance</label>
+      <input type="range" id="clampLum" min="0" max="100" value="10" step="1">
+      <span id="clampLumVal">10</span>
+    </div>
+    <div class="row">
+      <label>Resolution Scale</label>
+      <input type="range" id="resScale" min="0.25" max="1" value="1" step="0.05">
+      <span id="resScaleVal">1.0</span>
+    </div>
+    <div class="row">
+      <label>Env Intensity</label>
+      <input type="range" id="envIntensity" min="0" max="5" value="1.0" step="0.1">
+      <span id="envIntensityVal">1.0</span>
+    </div>
+
+    <h3>Features</h3>
+    <div class="row">
+      <label>NEE (Direct Light)</label>
+      <input type="checkbox" id="enableNEE" checked>
+    </div>
+    <div class="row">
+      <label>MIS</label>
+      <input type="checkbox" id="enableMIS" checked>
+    </div>
+    <div class="row">
+      <label>Denoise</label>
+      <input type="checkbox" id="enableDenoise" checked>
+    </div>
+    <div class="row">
+      <label>Denoise Strength</label>
+      <input type="range" id="denoiseStrength" min="0.05" max="2.0" value="0.5" step="0.05">
+      <span id="denoiseStrengthVal">0.5</span>
+    </div>
+
+    <h3>Debug View</h3>
+    <div class="row">
+      <label>Mode</label>
+      <select id="debugMode">
+        <option value="0" selected>Beauty</option>
+        <option value="1">Albedo</option>
+        <option value="2">Normals</option>
+        <option value="3">Depth</option>
+        <option value="4">Sample Count</option>
+        <option value="5">NaN Heatmap</option>
+      </select>
+    </div>
+
+    <h3>Controls</h3>
+    <div class="btn-row">
+      <button id="btnPause">⏸ Pause</button>
+      <button id="btnReset">🔄 Reset</button>
+    </div>
+
+    <div id="stats">Loading...</div>
+  </div>
+
+  <div id="status-bar">
+    <div class="status-item">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Initializing...</span>
+    </div>
+    <div class="status-item">
+      <span id="fpsText">-- fps</span>
+    </div>
+  </div>
+
+  <div id="error-banner">
+    <h2>WebGPU Not Available</h2>
+    <p>Path tracing requires a WebGPU-capable browser (Chrome 113+, Edge 113+, or Firefox Nightly with WebGPU flag enabled).</p>
+    <p>Try updating your browser or enabling the WebGPU flag.</p>
+  </div>
+
+  <script type="module">
+    import {
+      Scene, PerspectiveCamera, BangBangRenderer, Color, Vector3,
+      Mesh, BoxGeometry, PlaneGeometry, SphereGeometry,
+      PBRMaterial, BasicMaterial,
+      PathTracerRenderer, BVHBuilder, SceneExport
+    } from '../../src/index.js';
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // ── Check WebGPU availability ────────────────────────────────────────
+    if (!navigator.gpu) {
+      document.getElementById('error-banner').style.display = 'block';
+      document.getElementById('ui').style.display = 'none';
+      document.getElementById('status-bar').style.display = 'none';
+      throw new Error('WebGPU not supported');
+    }
+
+    // ── Canvas & renderer setup ──────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const scene = new Scene();
+    scene.background = new Color(0.0, 0.0, 0.0);
+
+    const camera = new PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 100);
+    camera.position.set(0, 2.5, 6);
+    camera.lookAt(new Vector3(0, 1.5, 0));
+
+    const renderer = new BangBangRenderer({
+      canvas,
+      width: canvas.width,
+      height: canvas.height,
+      backend: 'webgpu'
+    });
+
+    let pathTracer = null;
+    let controls = null;
+    let currentScene = 'cornell';
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    // ── Scene builders ───────────────────────────────────────────────────
+
+    function clearScene() {
+      const toRemove = [];
+      scene.traverse(obj => { if (obj.isMesh) toRemove.push(obj); });
+      for (const m of toRemove) {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) m.material.dispose();
+      }
+    }
+
+    function buildCornellBox() {
+      clearScene();
+
+      const white = new PBRMaterial({ color: new Color(0.73, 0.73, 0.73), roughness: 1.0, metallic: 0.0 });
+      const red   = new PBRMaterial({ color: new Color(0.65, 0.05, 0.05), roughness: 1.0, metallic: 0.0 });
+      const green = new PBRMaterial({ color: new Color(0.12, 0.45, 0.15), roughness: 1.0, metallic: 0.0 });
+      const light = new PBRMaterial({
+        color: new Color(1, 1, 1), roughness: 1.0, metallic: 0.0,
+        emissive: new Color(1, 0.9, 0.7), emissiveIntensity: 15
+      });
+
+      // Floor
+      const floor = new Mesh(new PlaneGeometry(5, 5), white);
+      floor.rotation.set(-Math.PI / 2, 0, 0);
+      scene.add(floor);
+
+      // Ceiling
+      const ceiling = new Mesh(new PlaneGeometry(5, 5), white);
+      ceiling.position.set(0, 5, 0);
+      ceiling.rotation.set(Math.PI / 2, 0, 0);
+      scene.add(ceiling);
+
+      // Back wall
+      const back = new Mesh(new PlaneGeometry(5, 5), white);
+      back.position.set(0, 2.5, -2.5);
+      scene.add(back);
+
+      // Left wall (red)
+      const left = new Mesh(new PlaneGeometry(5, 5), red);
+      left.position.set(-2.5, 2.5, 0);
+      left.rotation.set(0, Math.PI / 2, 0);
+      scene.add(left);
+
+      // Right wall (green)
+      const right = new Mesh(new PlaneGeometry(5, 5), green);
+      right.position.set(2.5, 2.5, 0);
+      right.rotation.set(0, -Math.PI / 2, 0);
+      scene.add(right);
+
+      // Light panel on ceiling
+      const lightPanel = new Mesh(new PlaneGeometry(1.5, 1.5), light);
+      lightPanel.position.set(0, 4.98, 0);
+      lightPanel.rotation.set(Math.PI / 2, 0, 0);
+      scene.add(lightPanel);
+
+      // Tall box
+      const tallBox = new Mesh(new BoxGeometry(1.2, 2.5, 1.2), white);
+      tallBox.position.set(-0.8, 1.25, -0.5);
+      tallBox.rotation.set(0, 0.3, 0);
+      scene.add(tallBox);
+
+      // Short box
+      const shortBox = new Mesh(new BoxGeometry(1.2, 1.2, 1.2), white);
+      shortBox.position.set(0.9, 0.6, 0.7);
+      shortBox.rotation.set(0, -0.2, 0);
+      scene.add(shortBox);
+
+      camera.position.set(0, 2.5, 7);
+      camera.lookAt(new Vector3(0, 2.0, 0));
+
+      console.log('[PathTracer Demo] Cornell Box scene ready');
+    }
+
+    function buildPBRBalls() {
+      clearScene();
+
+      // Ground plane
+      const groundMat = new PBRMaterial({
+        color: new Color(0.4, 0.4, 0.4), roughness: 0.8, metallic: 0.0
+      });
+      const ground = new Mesh(new PlaneGeometry(20, 20), groundMat);
+      ground.rotation.set(-Math.PI / 2, 0, 0);
+      scene.add(ground);
+
+      // Back wall
+      const wallMat = new PBRMaterial({
+        color: new Color(0.6, 0.6, 0.65), roughness: 0.9, metallic: 0.0
+      });
+      const backWall = new Mesh(new PlaneGeometry(20, 10), wallMat);
+      backWall.position.set(0, 5, -5);
+      scene.add(backWall);
+
+      // Emissive light panel
+      const emissiveMat = new PBRMaterial({
+        color: new Color(1, 1, 1), roughness: 1.0, metallic: 0.0,
+        emissive: new Color(1.0, 0.95, 0.85), emissiveIntensity: 12
+      });
+      const lightPanel = new Mesh(new PlaneGeometry(4, 2), emissiveMat);
+      lightPanel.position.set(0, 6, -2);
+      lightPanel.rotation.set(0.3, 0, 0);
+      scene.add(lightPanel);
+
+      // Metal sphere (gold)
+      const goldMat = new PBRMaterial({
+        color: new Color(1.0, 0.76, 0.33), roughness: 0.1, metallic: 1.0
+      });
+      const goldSphere = new Mesh(new SphereGeometry(0.8, 32, 32), goldMat);
+      goldSphere.position.set(-2.5, 0.8, 0);
+      scene.add(goldSphere);
+
+      // Chrome sphere
+      const chromeMat = new PBRMaterial({
+        color: new Color(0.95, 0.95, 0.95), roughness: 0.02, metallic: 1.0
+      });
+      const chromeSphere = new Mesh(new SphereGeometry(0.8, 32, 32), chromeMat);
+      chromeSphere.position.set(0, 0.8, 0);
+      scene.add(chromeSphere);
+
+      // Rough plastic sphere
+      const plasticMat = new PBRMaterial({
+        color: new Color(0.8, 0.1, 0.1), roughness: 0.65, metallic: 0.0
+      });
+      const plasticSphere = new Mesh(new SphereGeometry(0.8, 32, 32), plasticMat);
+      plasticSphere.position.set(2.5, 0.8, 0);
+      scene.add(plasticSphere);
+
+      // Rough plastic cube
+      const cubeMat = new PBRMaterial({
+        color: new Color(0.2, 0.5, 0.8), roughness: 0.4, metallic: 0.0
+      });
+      const cube = new Mesh(new BoxGeometry(1.2, 1.2, 1.2), cubeMat);
+      cube.position.set(1.2, 0.6, 2.0);
+      cube.rotation.set(0, 0.4, 0);
+      scene.add(cube);
+
+      // Roughness gradient spheres
+      for (let i = 0; i < 5; i++) {
+        const rMat = new PBRMaterial({
+          color: new Color(0.9, 0.9, 0.9), roughness: i * 0.25, metallic: 1.0
+        });
+        const rSphere = new Mesh(new SphereGeometry(0.4, 24, 24), rMat);
+        rSphere.position.set(-3 + i * 1.5, 0.4, 3.0);
+        scene.add(rSphere);
+      }
+
+      camera.position.set(0, 3, 8);
+      camera.lookAt(new Vector3(0, 1, 0));
+
+      console.log('[PathTracer Demo] PBR Balls scene ready');
+    }
+
+    // ── Initialize ───────────────────────────────────────────────────────
+
+    async function init() {
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      try {
+        statusDot.className = 'dot yellow';
+        statusText.textContent = 'Initializing WebGPU...';
+
+        await renderer.initialize();
+
+        if (renderer.backendType !== 'gpu-webgpu') {
+          document.getElementById('error-banner').style.display = 'block';
+          statusDot.className = 'dot red';
+          statusText.textContent = 'WebGPU not available';
+          return;
+        }
+
+        controls = new OrbitControls(camera, canvas);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 2, 0);
+
+        statusText.textContent = 'Building path tracer...';
+
+        // Create path tracer directly
+        const device = renderer.backend.device;
+        pathTracer = new PathTracerRenderer(device, canvas);
+        await pathTracer.initialize();
+
+        // Build initial scene
+        buildCornellBox();
+        rebuildPathTracer();
+
+        statusDot.className = 'dot green';
+        statusText.textContent = 'Path tracing active';
+
+        animate();
+      } catch (err) {
+        console.error('[PathTracer Demo] Init failed:', err);
+        statusDot.className = 'dot red';
+        statusText.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function rebuildPathTracer() {
+      // Update world matrices
+      scene.traverse(obj => {
+        if (obj.updateMatrixWorld) obj.updateMatrixWorld(true);
+      });
+
+      pathTracer.buildScene(scene, camera);
+
+      // Log debug info
+      const info = pathTracer.getDebugInfo();
+      console.log(`[PathTracer Demo] Scene built: ${info.triangles} tris, ${info.bvhNodes} BVH nodes, ${info.materials} mats, ${info.emissiveTris} emissive tris`);
+    }
+
+    // ── Render loop ──────────────────────────────────────────────────────
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (controls) {
+        controls.update();
+      }
+
+      // Ensure camera matrix is up-to-date before rendering
+      camera.updateMatrixWorld(true);
+
+      if (pathTracer) {
+        pathTracer.render(camera);
+      }
+
+      // FPS counter
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime > 1000) {
+        fps = Math.round(frameCount * 1000 / (now - lastTime));
+        frameCount = 0;
+        lastTime = now;
+        updateStats();
+        document.getElementById('fpsText').textContent = `${fps} fps`;
+      }
+    }
+
+    function updateStats() {
+      if (!pathTracer) return;
+      const info = pathTracer.getDebugInfo();
+      document.getElementById('stats').innerHTML = [
+        `Samples:    ${info.samples}`,
+        `Triangles:  ${info.triangles.toLocaleString()}`,
+        `BVH Nodes:  ${info.bvhNodes.toLocaleString()}`,
+        `Materials:  ${info.materials}`,
+        `Emissives:  ${info.emissiveTris}`,
+        `Resolution: ${info.resolution}`,
+        `FPS:        ${fps}`,
+      ].join('\n');
+    }
+
+    // ── UI Wiring ────────────────────────────────────────────────────────
+
+    // Scene buttons
+    document.getElementById('btnCornell').addEventListener('click', () => {
+      setActiveScene('cornell');
+      buildCornellBox();
+      rebuildPathTracer();
+    });
+    document.getElementById('btnPBR').addEventListener('click', () => {
+      setActiveScene('pbr');
+      buildPBRBalls();
+      rebuildPathTracer();
+    });
+    document.getElementById('btnCustom').addEventListener('click', () => {
+      document.getElementById('objInput').click();
+    });
+
+    function setActiveScene(name) {
+      currentScene = name;
+      document.getElementById('btnCornell').classList.toggle('active', name === 'cornell');
+      document.getElementById('btnPBR').classList.toggle('active', name === 'pbr');
+      document.getElementById('btnCustom').classList.toggle('active', name === 'custom');
+    }
+
+    // Slider bindings
+    const sliderBindings = [
+      { id: 'samplesPerFrame', key: 'samplesPerFrame', display: 'samplesPerFrameVal', parse: parseInt },
+      { id: 'maxBounces', key: 'maxBounces', display: 'maxBouncesVal', parse: parseInt },
+      { id: 'rrDepth', key: 'russianRouletteDepth', display: 'rrDepthVal', parse: parseInt },
+      { id: 'clampLum', key: 'clampLuminance', display: 'clampLumVal', parse: parseInt },
+      { id: 'resScale', key: 'resolutionScale', display: 'resScaleVal', parse: parseFloat, format: v => v.toFixed(2) },
+      { id: 'envIntensity', key: 'envIntensity', display: 'envIntensityVal', parse: parseFloat, format: v => v.toFixed(1) },
+      { id: 'denoiseStrength', key: 'denoiseStrength', display: 'denoiseStrengthVal', parse: parseFloat, format: v => v.toFixed(2) },
+    ];
+
+    for (const binding of sliderBindings) {
+      document.getElementById(binding.id).addEventListener('input', e => {
+        const val = binding.parse(e.target.value);
+        document.getElementById(binding.display).textContent = binding.format ? binding.format(val) : val;
+        if (pathTracer) pathTracer.setOptions({ [binding.key]: val });
+      });
+    }
+
+    // Checkbox bindings
+    document.getElementById('enableNEE').addEventListener('change', e => {
+      if (pathTracer) pathTracer.setOptions({ enableNEE: e.target.checked });
+    });
+    document.getElementById('enableMIS').addEventListener('change', e => {
+      if (pathTracer) pathTracer.setOptions({ enableMIS: e.target.checked });
+    });
+    document.getElementById('enableDenoise').addEventListener('change', e => {
+      if (pathTracer) pathTracer.setOptions({ denoise: e.target.checked });
+    });
+
+    // Debug mode
+    document.getElementById('debugMode').addEventListener('change', e => {
+      if (pathTracer) pathTracer.setOptions({ debugMode: parseInt(e.target.value) });
+    });
+
+    // Pause/Reset
+    let paused = false;
+    document.getElementById('btnPause').addEventListener('click', () => {
+      paused = !paused;
+      if (pathTracer) pathTracer.setOptions({ paused });
+      document.getElementById('btnPause').textContent = paused ? '▶ Resume' : '⏸ Pause';
+      document.getElementById('statusText').textContent = paused ? 'Paused' : 'Path tracing active';
+    });
+    document.getElementById('btnReset').addEventListener('click', () => {
+      if (pathTracer) pathTracer.resetAccumulation();
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      if (pathTracer) pathTracer.resetAccumulation();
+    });
+
+    // File input for OBJ
+    document.getElementById('objInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setActiveScene('custom');
+      // For now, show a message that OBJ loading is via the built-in loaders
+      console.log(`[PathTracer Demo] Custom OBJ loading: ${file.name}`);
+      alert(`File loaded: ${file.name}\nFor OBJ files, use the OBJLoader API to load meshes into the scene, then call rebuildPathTracer().`);
+    });
+
+    // Start
+    init();
+  </script>
+</body>
+</html>

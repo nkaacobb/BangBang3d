@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3d - Grid Gizmo & Object Manipulation</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    
+    #canvas {
+      display: block;
+      cursor: crosshair;
+    }
+    
+    #canvas.dragging {
+      cursor: move;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 12px 18px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 350px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 20px;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+    
+    p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: #c9d1d9;
+    }
+    
+    .controls {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .axis-labels {
+      font-size: 11px;
+      margin: 8px 0;
+      color: #8b949e;
+    }
+    
+    .axis-x { color: #ff6b6b; }
+    .axis-y { color: #51cf66; }
+    .axis-z { color: #339af0; }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 90px;
+    }
+    
+    button {
+      width: 100%;
+      padding: 6px 8px;
+      margin: 4px 0;
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+      line-height: 1.3;
+    }
+    
+    button:hover {
+      background: #30363d;
+      border-color: #58a6ff;
+    }
+    
+    button:active {
+      background: #161b22;
+    }
+    
+    button.danger {
+      border-color: #da3633;
+      color: #ff7b72;
+    }
+    
+    button.danger:hover {
+      background: #3d1615;
+      border-color: #ff7b72;
+    }
+    
+    .color-control {
+      margin: 8px 0;
+    }
+    
+    .color-label {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+    }
+    
+    input[type="color"] {
+      width: 100%;
+      height: 30px;
+      cursor: pointer;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      background: #21262d;
+    }
+    
+    #selection-info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      min-width: 200px;
+    }
+    
+    .selection-title {
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+    
+    .selection-pos {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #79c0ff;
+      line-height: 1.5;
+    }
+    
+    #no-selection {
+      color: #8b949e;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <h1>Grid Gizmo Demo</h1>
+    <p>Interactive 3D object manipulation with grid reference</p>
+    
+    <div class="axis-labels">
+      <div>Axes: <span class="axis-x">X (Red)</span> · <span class="axis-y">Y (Green)</span> · <span class="axis-z">Z (Blue)</span></div>
+    </div>
+    
+    <div class="controls">
+      <p><strong>Camera Controls:</strong></p>
+      <p>• Left drag: Rotate</p>
+      <p>• Right drag: Pan</p>
+      <p>• Wheel: Zoom</p>
+    </div>
+    
+    <div class="controls">
+      <p><strong>Object Controls:</strong></p>
+      <p>• Click object to select</p>
+      <p>• Drag selected object:</p>
+      <p>&nbsp;&nbsp;- Left/Right: Move X</p>
+      <p>&nbsp;&nbsp;- Up/Down: Move Y</p>
+      <p>&nbsp;&nbsp;- Ctrl+Up/Down: Move Z</p>
+      <p>• Click empty to deselect</p>
+    </div>
+  </div>
+  
+  <div id="controls">
+    <div style="font-weight: 600; color: #c9d1d9; margin-bottom: 8px; text-align: center;">Objects</div>
+    <button id="btnAddSphere">Add Sphere</button>
+    <button id="btnAddCube">Add Cube</button>
+    <button id="btnClearAll" class="danger">Clear All</button>
+    
+    <div style="margin: 16px 0 8px; font-weight: 600; color: #c9d1d9; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; text-align: center;">Colors</div>
+    
+    <div class="color-control">
+      <div class="color-label">Grid Color:</div>
+      <input type="color" id="gridColor" value="#878787">
+    </div>
+    
+    <div class="color-control">
+      <div class="color-label">Background:</div>
+      <input type="color" id="bgColor" value="#505050">
+    </div>
+  </div>
+  
+  <div id="selection-info">
+    <div id="no-selection">No object selected</div>
+    <div id="selection-data" style="display: none;">
+      <div class="selection-title" id="selection-name">Cube 1</div>
+      <div class="selection-pos">
+        <div>X: <span id="pos-x">0.00</span></div>
+        <div>Y: <span id="pos-y">0.00</span></div>
+        <div>Z: <span id="pos-z">0.00</span></div>
+      </div>
+    </div>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      SphereGeometry,
+      BasicMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      Vector2,
+      Vector3,
+      Color,
+      GridOverlay,
+      Raycaster
+    } from '../../src/index.js';
+    
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // Global variables
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let gridOverlay = null;
+    let animationId = null;
+    let raycaster = new Raycaster();
+    
+    // Object management
+    let sceneObjects = [];
+    let selectedObject = null;
+    let objectCounter = { sphere: 0, cube: 0 };
+    
+    // Mouse state
+    let isDraggingObject = false;
+    let mouseDownOnObject = false;
+    let dragStartPos = new Vector2();
+    let dragStartObjectPos = new Vector3();
+    let mouse = new Vector2();
+
+    // Initialize renderer
+    async function initRenderer(backendType = 'gpu') {
+      console.log(`Initializing ${backendType} backend...`);
+
+      const canvas = document.getElementById('canvas');
+
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: backendType
+      });
+
+      await renderer.initialize();
+      
+      if (!renderer.isReady()) {
+        console.error('Renderer failed to initialize');
+        return;
+      }
+      
+      renderer.setClearColor(0x505050);
+      
+      console.log('Backend initialized:', renderer.backendType);
+
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      if (!animationId) {
+        animate(performance.now());
+      }
+    }
+
+    // Create scene
+    function createScene() {
+      scene = new Scene();
+      scene.background = new Color(0.314, 0.314, 0.314); // RGB(80, 80, 80)
+
+      camera = new PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.5,
+        100
+      );
+      camera.position.set(6.85, 10.72, 16.87);
+      camera.lookAt(new Vector3(0, 0, 0));
+      
+      // Create infinite grid overlay (same as textured example)
+      gridOverlay = new GridOverlay({
+        yPosition: 0.0,
+        gridScale: 1.0,
+        gridOpacity: 1.0,
+        fadeDistance: 100.0,
+        adaptive: false,
+        axisXColor: { r: 1.0, g: 0.2, b: 0.2 }, // Red X axis
+        axisZColor: { r: 0.2, g: 1.0, b: 0.2 }, // Green Z axis
+        horizonColor: { r: 0.314, g: 0.314, b: 0.314 },
+        gridColor: { r: 0.529, g: 0.529, b: 0.529 } // RGB(135, 135, 135)
+      });
+      gridOverlay.addToScene(scene);
+    }
+
+    // Add object to scene
+    function addObject(type) {
+      let geometry, material, object;
+      const colors = [
+        0xff6b6b, // Red
+        0x51cf66, // Green
+        0x339af0, // Blue
+        0xfeca57, // Yellow
+        0xee5a6f, // Pink
+        0x48dbfb  // Cyan
+      ];
+      
+      const colorIndex = sceneObjects.length % colors.length;
+      
+      if (type === 'sphere') {
+        objectCounter.sphere++;
+        geometry = new SphereGeometry(0.5, 16, 12);
+        material = new BasicMaterial({ color: colors[colorIndex] });
+        object = new Mesh(geometry, material);
+        object.userData.name = `Sphere ${objectCounter.sphere}`;
+      } else if (type === 'cube') {
+        objectCounter.cube++;
+        geometry = new BoxGeometry(1, 1, 1);
+        material = new BasicMaterial({ color: colors[colorIndex] });
+        object = new Mesh(geometry, material);
+        object.userData.name = `Cube ${objectCounter.cube}`;
+      }
+      
+      // Position slightly above grid with some randomness
+      object.position.set(
+        (Math.random() - 0.5) * 4,
+        1 + Math.random() * 2,
+        (Math.random() - 0.5) * 4
+      );
+      
+      object.userData.originalColor = colors[colorIndex];
+      scene.add(object);
+      sceneObjects.push(object);
+      
+      return object;
+    }
+
+    // Clear all objects
+    function clearAll() {
+      sceneObjects.forEach(obj => {
+        scene.remove(obj);
+      });
+      sceneObjects = [];
+      selectedObject = null;
+      updateSelectionUI();
+    }
+
+    // Select object
+    function selectObject(object) {
+      // Deselect previous
+      if (selectedObject) {
+        selectedObject.material.color.setHex(selectedObject.userData.originalColor);
+      }
+      
+      selectedObject = object;
+      
+      if (selectedObject) {
+        // Highlight selected object (make brighter)
+        const origColor = selectedObject.userData.originalColor;
+        const r = ((origColor >> 16) & 0xff) / 255;
+        const g = ((origColor >> 8) & 0xff) / 255;
+        const b = (origColor & 0xff) / 255;
+        
+        // Mix with white for highlight
+        const highlightFactor = 0.5;
+        const hr = r + (1 - r) * highlightFactor;
+        const hg = g + (1 - g) * highlightFactor;
+        const hb = b + (1 - b) * highlightFactor;
+        
+        selectedObject.material.color.setRGB(hr, hg, hb);
+      }
+      
+      updateSelectionUI();
+    }
+
+    // Update selection UI
+    function updateSelectionUI() {
+      const noSelection = document.getElementById('no-selection');
+      const selectionData = document.getElementById('selection-data');
+      
+      if (selectedObject) {
+        noSelection.style.display = 'none';
+        selectionData.style.display = 'block';
+        document.getElementById('selection-name').textContent = selectedObject.userData.name;
+        updatePositionDisplay();
+      } else {
+        noSelection.style.display = 'block';
+        selectionData.style.display = 'none';
+      }
+    }
+
+    // Update position display
+    function updatePositionDisplay() {
+      if (selectedObject) {
+        document.getElementById('pos-x').textContent = selectedObject.position.x.toFixed(2);
+        document.getElementById('pos-y').textContent = selectedObject.position.y.toFixed(2);
+        document.getElementById('pos-z').textContent = selectedObject.position.z.toFixed(2);
+      }
+    }
+
+    // Get normalized mouse coordinates
+    function getNormalizedMouseCoords(event) {
+      const canvas = document.getElementById('canvas');
+      const rect = canvas.getBoundingClientRect();
+      return new Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+    }
+
+    // Handle mouse down
+    function onMouseDown(event) {
+      if (event.button !== 0) return; // Only left click
+      
+      const coords = getNormalizedMouseCoords(event);
+      raycaster.setFromCamera(coords, camera);
+      
+      const intersects = raycaster.intersectObjects(sceneObjects, false);
+      
+      if (intersects.length > 0 && intersects[0].object === selectedObject) {
+        // Starting drag on selected object
+        mouseDownOnObject = true;
+        isDraggingObject = false; // Will become true on mouse move
+        dragStartPos.copy(coords);
+        dragStartObjectPos.copy(selectedObject.position);
+        
+        // Disable orbit controls during object drag
+        controls.enabled = false;
+        document.getElementById('canvas').classList.add('dragging');
+        
+        event.preventDefault();
+      } else if (intersects.length > 0) {
+        // Select different object
+        selectObject(intersects[0].object);
+        mouseDownOnObject = false;
+      } else {
+        // Deselect
+        selectObject(null);
+        mouseDownOnObject = false;
+      }
+    }
+
+    // Handle mouse move
+    function onMouseMove(event) {
+      if (!mouseDownOnObject || !selectedObject) return;
+      
+      isDraggingObject = true;
+      
+      const coords = getNormalizedMouseCoords(event);
+      const deltaX = coords.x - dragStartPos.x;
+      const deltaY = coords.y - dragStartPos.y;
+      
+      // Convert screen space delta to world space
+      // Scale factor based on distance from camera
+      const distance = camera.position.distanceTo(selectedObject.position);
+      const fov = camera.fov * Math.PI / 180;
+      const scale = 2 * Math.tan(fov / 2) * distance;
+      
+      const worldDeltaX = deltaX * scale;
+      const worldDeltaY = deltaY * scale;
+      
+      // Get camera's right and up vectors in world space
+      const cameraMatrix = camera.matrixWorld;
+      const right = new Vector3(cameraMatrix.elements[0], cameraMatrix.elements[1], cameraMatrix.elements[2]);
+      const up = new Vector3(cameraMatrix.elements[4], cameraMatrix.elements[5], cameraMatrix.elements[6]);
+      
+      if (event.ctrlKey) {
+        // Ctrl held: move along Z axis (depth)
+        const forward = new Vector3(cameraMatrix.elements[8], cameraMatrix.elements[9], cameraMatrix.elements[10]);
+        const moveZ = forward.multiplyScalar(worldDeltaY);
+        
+        selectedObject.position.copy(dragStartObjectPos);
+        selectedObject.position.add(moveZ);
+      } else {
+        // Default: move in XY relative to camera view
+        const moveX = right.multiplyScalar(worldDeltaX);
+        const moveY = up.multiplyScalar(worldDeltaY);
+        
+        selectedObject.position.copy(dragStartObjectPos);
+        selectedObject.position.add(moveX);
+        selectedObject.position.add(moveY);
+      }
+      
+      updatePositionDisplay();
+    }
+
+    // Handle mouse up
+    function onMouseUp(event) {
+      if (mouseDownOnObject) {
+        controls.enabled = true;
+        document.getElementById('canvas').classList.remove('dragging');
+      }
+      
+      mouseDownOnObject = false;
+      isDraggingObject = false;
+    }
+
+    // Animation loop
+    function animate(currentTime) {
+      animationId = requestAnimationFrame(animate);
+      
+      if (controls) {
+        controls.update();
+      }
+      
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    // Button event listeners
+    document.getElementById('btnAddSphere').addEventListener('click', () => {
+      addObject('sphere');
+    });
+
+    document.getElementById('btnAddCube').addEventListener('click', () => {
+      addObject('cube');
+    });
+
+    document.getElementById('btnClearAll').addEventListener('click', () => {
+      if (confirm('Clear all objects?')) {
+        clearAll();
+      }
+    });
+
+    // Grid color control
+    document.getElementById('gridColor').addEventListener('input', (e) => {
+      const hex = e.target.value;
+      const r = parseInt(hex.substr(1, 2), 16) / 255;
+      const g = parseInt(hex.substr(3, 2), 16) / 255;
+      const b = parseInt(hex.substr(5, 2), 16) / 255;
+      if (gridOverlay) {
+        gridOverlay.setGridColor(r, g, b);
+      }
+    });
+
+    // Background color control
+    document.getElementById('bgColor').addEventListener('input', (e) => {
+      const hex = e.target.value;
+      const colorValue = parseInt(hex.substr(1), 16);
+      const r = parseInt(hex.substr(1, 2), 16) / 255;
+      const g = parseInt(hex.substr(3, 2), 16) / 255;
+      const b = parseInt(hex.substr(5, 2), 16) / 255;
+      if (renderer) {
+        renderer.setClearColor(colorValue);
+      }
+      if (scene) {
+        scene.background.r = r;
+        scene.background.g = g;
+        scene.background.b = b;
+      }
+    });
+
+    // Mouse event listeners
+    const canvas = document.getElementById('canvas');
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+
+    // Initialize
+    createScene();
+    initRenderer('gpu');
+  </script>
+</body>
+</html>

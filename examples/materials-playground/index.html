@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3D - Materials Playground</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    #container {
+      display: grid;
+      grid-template-columns: 250px 1fr 300px;
+      grid-template-rows: 1fr 200px;
+      height: 100vh;
+      gap: 0;
+    }
+
+    #left-panel {
+      grid-column: 1;
+      grid-row: 1 / 3;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    #viewport {
+      grid-column: 2;
+      grid-row: 1;
+      position: relative;
+      background: #0d1117;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #right-panel {
+      grid-column: 3;
+      grid-row: 1 / 3;
+      background: #161b22;
+      border-left: 1px solid #30363d;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    #bottom-panel {
+      grid-column: 2;
+      grid-row: 2;
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: #2ea043;
+    }
+
+    .btn-secondary {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+    }
+
+    .btn-secondary:hover {
+      background: #30363d;
+    }
+
+    .btn-small {
+      padding: 4px 8px;
+      font-size: 11px;
+      display: inline-block;
+      width: auto;
+      margin: 2px;
+    }
+
+    .object-list {
+      margin-top: 12px;
+    }
+
+    .object-item {
+      padding: 8px 10px;
+      margin: 4px 0;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s;
+    }
+
+    .object-item:hover {
+      background: #161b22;
+      border-color: #58a6ff;
+    }
+
+    .object-item.selected {
+      background: #1f6feb;
+      border-color: #58a6ff;
+      color: white;
+    }
+
+    .property-group {
+      margin: 16px 0;
+    }
+
+    .property-label {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .property-input {
+      width: 100%;
+      padding: 6px 10px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    .property-input:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    select.property-input {
+      cursor: pointer;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 8px 0;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 36px;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 8px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+
+    .info-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #1f6feb;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .divider {
+      height: 1px;
+      background: #30363d;
+      margin: 12px 0;
+    }
+
+    #stats {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      color: #79c0ff;
+      border: 1px solid rgba(121, 192, 255, 0.3);
+      pointer-events: none;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 4px;
+      margin: 8px 0;
+    }
+
+    .btn-group .btn {
+      flex: 1;
+    }
+
+    .disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: #8b949e;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <!-- Left Panel: Scene Objects -->
+    <div id="left-panel">
+      <div class="panel-title">Scene Objects</div>
+      
+      <button class="btn" id="add-cube">+ Add Cube</button>
+      <button class="btn" id="add-sphere">+ Add Sphere</button>
+      <button class="btn" id="add-plane">+ Add Plane</button>
+      
+      <div class="divider"></div>
+      
+      <div class="panel-title" style="font-size: 12px; margin-top: 0;">Lighting Presets</div>
+      <button class="btn btn-secondary" id="preset-studio">Studio</button>
+      <button class="btn btn-secondary" id="preset-outdoor">Outdoor Sun</button>
+      <button class="btn btn-secondary" id="preset-warm">Warm Interior</button>
+      
+      <div class="divider"></div>
+      
+      <div class="object-list" id="object-list">
+        <div class="empty-state">No objects yet<br>Add one to get started</div>
+      </div>
+    </div>
+
+    <!-- Viewport -->
+    <div id="viewport">
+      <canvas id="canvas"></canvas>
+      <div id="stats">
+        <div>Backend: <span id="backend-type">--</span></div>
+        <div>Objects: <span id="object-count">0</span></div>
+        <div>FPS: <span id="fps-counter">0</span></div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Material Inspector -->
+    <div id="right-panel">
+      <div class="panel-title">Material Inspector</div>
+      
+      <div id="material-inspector">
+        <div class="empty-state">Select an object to edit its material</div>
+      </div>
+    </div>
+
+    <!-- Bottom Panel: JSON Import/Export -->
+    <div id="bottom-panel">
+      <div class="panel-title">Material JSON</div>
+      
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="export-json">Export Material</button>
+        <button class="btn btn-secondary" id="import-json">Import Material</button>
+        <button class="btn btn-secondary" id="export-library">Export Library</button>
+      </div>
+      
+      <textarea id="json-output" placeholder="Material JSON will appear here..."></textarea>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      BasicMaterial,
+      LambertMaterial,
+      DebugMaterial,
+      PBRMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      Vector3,
+      AmbientLight,
+      DirectionalLight,
+      TextureLoader,
+      MaterialSerializer
+    } from '../../src/index.js';
+
+    // State
+    let renderer, scene, camera;
+    let objects = [];
+    let selectedObject = null;
+    let objectIdCounter = 0;
+    let lights = [];
+    let textureLoader = new TextureLoader();
+    let materialSerializer = new MaterialSerializer();
+    
+    // Animation state
+    let frameCount = 0;
+    let lastTime = Date.now();
+    let fps = 0;
+
+    // Initialize
+    async function init() {
+      // Create renderer
+      const canvas = document.getElementById('canvas');
+      renderer = new BangBangRenderer({ 
+        canvas,
+        preferredBackend: 'auto'
+      });
+      
+      await renderer.initialize();
+      
+      // Set size
+      const width = canvas.parentElement.clientWidth;
+      const height = canvas.parentElement.clientHeight;
+      renderer.setSize(width, height);
+      
+      // Update UI
+      document.getElementById('backend-type').textContent = renderer.backend?.backendType || 'unknown';
+      
+      // Create scene
+      scene = new Scene();
+      scene.background = { r: 0.05, g: 0.06, b: 0.07 };
+      
+      // Create camera
+      camera = new PerspectiveCamera(60, width / height, 0.1, 1000);
+      camera.position.set(5, 3, 5);
+      camera.lookAt(new Vector3(0, 0, 0));
+      
+      // Add lights
+      const ambient = new AmbientLight(0x404040, 0.5);
+      scene.add(ambient);
+      lights.push(ambient);
+      
+      const directional = new DirectionalLight(0xffffff, 0.8);
+      directional.position.set(5, 5, 5);
+      scene.add(directional);
+      lights.push(directional);
+      
+      // Setup events
+      setupEventListeners();
+      
+      // Start animation loop
+      animate();
+    }
+
+    function setupEventListeners() {
+      // Add object buttons
+      document.getElementById('add-cube').addEventListener('click', () => {
+        addObject('cube');
+      });
+      
+      document.getElementById('add-sphere').addEventListener('click', () => {
+        addObject('sphere');
+      });
+      
+      document.getElementById('add-plane').addEventListener('click', () => {
+        addObject('plane');
+      });
+      
+      // Lighting preset buttons
+      document.getElementById('preset-studio').addEventListener('click', () => {
+        applyLightingPreset('studio');
+      });
+      
+      document.getElementById('preset-outdoor').addEventListener('click', () => {
+        applyLightingPreset('outdoor');
+      });
+      
+      document.getElementById('preset-warm').addEventListener('click', () => {
+        applyLightingPreset('warm');
+      });
+      
+      // JSON export/import buttons
+      document.getElementById('export-json').addEventListener('click', () => {
+        exportMaterialJSON();
+      });
+      
+      document.getElementById('import-json').addEventListener('click', () => {
+        importMaterialJSON();
+      });
+      
+      document.getElementById('export-library').addEventListener('click', () => {
+        exportMaterialLibrary();
+      });
+      
+      // Window resize
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function addObject(type) {
+      let geometry;
+      const id = ++objectIdCounter;
+      const name = `${type.charAt(0).toUpperCase() + type.slice(1)} ${id}`;
+      
+      // Create geometry
+      switch(type) {
+        case 'cube':
+          geometry = new BoxGeometry(1, 1, 1);
+          break;
+        case 'sphere':
+          geometry = new SphereGeometry(0.7, 32, 24);
+          break;
+        case 'plane':
+          geometry = new PlaneGeometry(2, 2);
+          break;
+      }
+      
+      // Create material (default to Lambert)
+      const material = new LambertMaterial({ color: 0x3b82f6 });
+      
+      // Create mesh
+      const mesh = new Mesh(geometry, material);
+      mesh.name = name;
+      mesh.userData = { id, type };
+      
+      // Position objects in a grid
+      const gridPos = objects.length;
+      mesh.position.set(
+        (gridPos % 3) * 2 - 2,
+        0,
+        Math.floor(gridPos / 3) * 2 - 2
+      );
+      
+      // Add to scene
+      scene.add(mesh);
+      objects.push(mesh);
+      
+      // Update UI
+      updateObjectList();
+      selectObject(mesh);
+      updateStats();
+    }
+
+    function updateObjectList() {
+      const listEl = document.getElementById('object-list');
+      
+      if (objects.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">No objects yet<br>Add one to get started</div>';
+        return;
+      }
+      
+      listEl.innerHTML = '';
+      
+      objects.forEach(obj => {
+        const item = document.createElement('div');
+        item.className = 'object-item';
+        if (obj === selectedObject) {
+          item.classList.add('selected');
+        }
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = obj.name;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '×';
+        deleteBtn.className = 'btn-small btn-secondary';
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          removeObject(obj);
+        };
+        
+        item.appendChild(nameSpan);
+        item.appendChild(deleteBtn);
+        
+        item.onclick = () => selectObject(obj);
+        
+        listEl.appendChild(item);
+      });
+    }
+
+    function removeObject(obj) {
+      scene.remove(obj);
+      const index = objects.indexOf(obj);
+      if (index > -1) {
+        objects.splice(index, 1);
+      }
+      
+      if (selectedObject === obj) {
+        selectedObject = null;
+        updateMaterialInspector();
+      }
+      
+      updateObjectList();
+      updateStats();
+    }
+    
+    function applyLightingPreset(presetName) {
+      // Remove all existing lights
+      lights.forEach(light => scene.remove(light));
+      lights = [];
+      
+      switch(presetName) {
+        case 'studio':
+          // Studio lighting: 3-point lighting setup
+          const ambient = new AmbientLight(0x404040, 0.4);
+          scene.add(ambient);
+          lights.push(ambient);
+          
+          const keyLight = new DirectionalLight(0xffffff, 0.8);
+          keyLight.position.set(5, 5, 5);
+          scene.add(keyLight);
+          lights.push(keyLight);
+          
+          const fillLight = new DirectionalLight(0x88aaff, 0.3);
+          fillLight.position.set(-3, 2, 3);
+          scene.add(fillLight);
+          lights.push(fillLight);
+          
+          const rimLight = new DirectionalLight(0xffffaa, 0.4);
+          rimLight.position.set(0, 3, -5);
+          scene.add(rimLight);
+          lights.push(rimLight);
+          break;
+          
+        case 'outdoor':
+          // Outdoor sun lighting: strong directional with blue ambient
+          const skyAmbient = new AmbientLight(0x87ceeb, 0.5);
+          scene.add(skyAmbient);
+          lights.push(skyAmbient);
+          
+          const sunLight = new DirectionalLight(0xffffee, 1.2);
+          sunLight.position.set(10, 8, 5);
+          scene.add(sunLight);
+          lights.push(sunLight);
+          break;
+          
+        case 'warm':
+          // Warm interior: orange ambient with soft directional
+          const warmAmbient = new AmbientLight(0xffaa77, 0.6);
+          scene.add(warmAmbient);
+          lights.push(warmAmbient);
+          
+          const softLight = new DirectionalLight(0xffddbb, 0.5);
+          softLight.position.set(3, 4, 4);
+          scene.add(softLight);
+          lights.push(softLight);
+          break;
+      }
+    }
+
+    function selectObject(obj) {
+      selectedObject = obj;
+      updateObjectList();
+      updateMaterialInspector();
+    }
+
+    function updateMaterialInspector() {
+      const inspectorEl = document.getElementById('material-inspector');
+      
+      if (!selectedObject) {
+        inspectorEl.innerHTML = '<div class="empty-state">Select an object to edit its material</div>';
+        return;
+      }
+      
+      const material = selectedObject.material;
+      
+      inspectorEl.innerHTML = `
+        <div class="property-group">
+          <label class="property-label">Material Type</label>
+          <select class="property-input" id="material-type">
+            <option value="basic" ${material.type === 'BasicMaterial' ? 'selected' : ''}>Basic (Unlit)</option>
+            <option value="lambert" ${material.type === 'LambertMaterial' ? 'selected' : ''}>Lambert (Diffuse)</option>
+            <option value="pbr" ${material.type === 'PBRMaterial' ? 'selected' : ''}>PBR (Physically Based)</option>
+            <option value="debug" ${material.type === 'DebugMaterial' ? 'selected' : ''}>Debug</option>
+          </select>
+        </div>
+        
+        <div id="material-properties">
+          ${getMaterialPropertiesHTML(material)}
+        </div>
+        
+        <div class="property-group">
+          <label class="property-label">Common Properties</label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="prop-transparent" ${material.transparent ? 'checked' : ''}>
+            Transparent
+          </label>
+          
+          <label class="property-label">Opacity: <span id="opacity-value">${material.opacity.toFixed(2)}</span></label>
+          <input type="range" id="prop-opacity" min="0" max="1" step="0.01" value="${material.opacity}">
+          
+          <label class="property-label">Side</label>
+          <select class="property-input" id="prop-side">
+            <option value="FrontSide" ${material.side === 'FrontSide' ? 'selected' : ''}>Front</option>
+            <option value="BackSide" ${material.side === 'BackSide' ? 'selected' : ''}>Back</option>
+            <option value="DoubleSide" ${material.side === 'DoubleSide' ? 'selected' : ''}>Double</option>
+          </select>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="prop-visible" ${material.visible ? 'checked' : ''}>
+            Visible
+          </label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" id="prop-depthWrite" ${material.depthWrite ? 'checked' : ''}>
+            Depth Write
+          </label>
+        </div>
+      `;
+      
+      // Attach event listeners
+      attachMaterialEventListeners();
+    }
+
+    function getMaterialPropertiesHTML(material) {
+      if (material.type === 'BasicMaterial') {
+        return `
+          <div class="property-group">
+            <label class="property-label">Color</label>
+            <input type="color" id="prop-color" value="${rgbToHex(material.color)}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Texture Map</label>
+            <select class="property-input" id="prop-map">
+              <option value="none" ${!material.map ? 'selected' : ''}>None</option>
+              <option value="checker" ${material.map && material.map.procedural?.generator === 'checker' ? 'selected' : ''}>Checker</option>
+              <option value="uvtest" ${material.map && material.map.procedural?.generator === 'uvtest' ? 'selected' : ''}>UV Test</option>
+              <option value="grid" ${material.map && material.map.procedural?.generator === 'grid' ? 'selected' : ''}>Grid</option>
+              <option value="wood" ${material.map && material.map.procedural?.generator === 'wood' ? 'selected' : ''}>Wood</option>
+              <option value="brick" ${material.map && material.map.procedural?.generator === 'brick' ? 'selected' : ''}>Brick</option>
+              <option value="noise" ${material.map && material.map.procedural?.generator === 'noise' ? 'selected' : ''}>Noise</option>
+              <option value="gradient" ${material.map && material.map.procedural?.generator === 'gradient' ? 'selected' : ''}>Gradient</option>
+            </select>
+          </div>
+        `;
+      } else if (material.type === 'LambertMaterial') {
+        return `
+          <div class="property-group">
+            <label class="property-label">Diffuse Color</label>
+            <input type="color" id="prop-color" value="${rgbToHex(material.color)}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Texture Map</label>
+            <select class="property-input" id="prop-map">
+              <option value="none" ${!material.map ? 'selected' : ''}>None</option>
+              <option value="checker" ${material.map && material.map.procedural?.generator === 'checker' ? 'selected' : ''}>Checker</option>
+              <option value="uvtest" ${material.map && material.map.procedural?.generator === 'uvtest' ? 'selected' : ''}>UV Test</option>
+              <option value="grid" ${material.map && material.map.procedural?.generator === 'grid' ? 'selected' : ''}>Grid</option>
+              <option value="wood" ${material.map && material.map.procedural?.generator === 'wood' ? 'selected' : ''}>Wood</option>
+              <option value="brick" ${material.map && material.map.procedural?.generator === 'brick' ? 'selected' : ''}>Brick</option>
+              <option value="noise" ${material.map && material.map.procedural?.generator === 'noise' ? 'selected' : ''}>Noise</option>
+              <option value="gradient" ${material.map && material.map.procedural?.generator === 'gradient' ? 'selected' : ''}>Gradient</option>
+            </select>
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Emissive Color</label>
+            <input type="color" id="prop-emissive" value="${rgbToHex(material.emissive)}">
+          </div>
+          <div class="property-group">
+            <label class="property-label">Emissive Intensity: <span id="emissive-value">${material.emissiveIntensity.toFixed(2)}</span></label>
+            <input type="range" id="prop-emissive-intensity" min="0" max="2" step="0.1" value="${material.emissiveIntensity}">
+          </div>
+        `;
+      } else if (material.type === 'PBRMaterial') {
+        return `
+          <div class="property-group">
+            <label class="property-label">Albedo Color</label>
+            <input type="color" id="prop-color" value="${rgbToHex(material.color)}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Albedo Map</label>
+            <select class="property-input" id="prop-map">
+              <option value="none" ${!material.map ? 'selected' : ''}>None</option>
+              <option value="checker" ${material.map && material.map.procedural?.generator === 'checker' ? 'selected' : ''}>Checker</option>
+              <option value="uvtest" ${material.map && material.map.procedural?.generator === 'uvtest' ? 'selected' : ''}>UV Test</option>
+              <option value="grid" ${material.map && material.map.procedural?.generator === 'grid' ? 'selected' : ''}>Grid</option>
+              <option value="wood" ${material.map && material.map.procedural?.generator === 'wood' ? 'selected' : ''}>Wood</option>
+              <option value="brick" ${material.map && material.map.procedural?.generator === 'brick' ? 'selected' : ''}>Brick</option>
+              <option value="noise" ${material.map && material.map.procedural?.generator === 'noise' ? 'selected' : ''}>Noise</option>
+              <option value="gradient" ${material.map && material.map.procedural?.generator === 'gradient' ? 'selected' : ''}>Gradient</option>
+            </select>
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Metallic: <span id="metallic-value">${material.metallic.toFixed(2)}</span></label>
+            <input type="range" id="prop-metallic" min="0" max="1" step="0.01" value="${material.metallic}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Roughness: <span id="roughness-value">${material.roughness.toFixed(2)}</span></label>
+            <input type="range" id="prop-roughness" min="0" max="1" step="0.01" value="${material.roughness}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Normal Scale: <span id="normal-scale-value">${material.normalScale.toFixed(2)}</span></label>
+            <input type="range" id="prop-normal-scale" min="0" max="2" step="0.1" value="${material.normalScale}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">AO Intensity: <span id="ao-value">${material.aoMapIntensity.toFixed(2)}</span></label>
+            <input type="range" id="prop-ao-intensity" min="0" max="2" step="0.1" value="${material.aoMapIntensity}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Emissive Color</label>
+            <input type="color" id="prop-emissive" value="${rgbToHex(material.emissive)}">
+          </div>
+          
+          <div class="property-group">
+            <label class="property-label">Emissive Intensity: <span id="emissive-value">${material.emissiveIntensity.toFixed(2)}</span></label>
+            <input type="range" id="prop-emissive-intensity" min="0" max="2" step="0.1" value="${material.emissiveIntensity}">
+          </div>
+        `;
+      } else if (material.type === 'DebugMaterial') {
+        return `
+          <div class="property-group">
+            <label class="property-label">Debug Mode</label>
+            <select class="property-input" id="prop-debug-mode">
+              <option value="normals" ${material.mode === 'normals' ? 'selected' : ''}>Normals</option>
+              <option value="uvs" ${material.mode === 'uvs' ? 'selected' : ''}>UVs</option>
+              <option value="depth" ${material.mode === 'depth' ? 'selected' : ''}>Depth</option>
+              <option value="worldPosition" ${material.mode === 'worldPosition' ? 'selected' : ''}>World Position</option>
+            </select>
+          </div>
+        `;
+      }
+      return '';
+    }
+
+    function attachMaterialEventListeners() {
+      // Material type change
+      const typeEl = document.getElementById('material-type');
+      if (typeEl) {
+        typeEl.addEventListener('change', (e) => {
+          changeMaterialType(e.target.value);
+        });
+      }
+      
+      // Common properties
+      const transparentEl = document.getElementById('prop-transparent');
+      if (transparentEl) {
+        transparentEl.addEventListener('change', (e) => {
+          selectedObject.material.transparent = e.target.checked;
+        });
+      }
+      
+      const opacityEl = document.getElementById('prop-opacity');
+      if (opacityEl) {
+        opacityEl.addEventListener('input', (e) => {
+          selectedObject.material.opacity = parseFloat(e.target.value);
+          document.getElementById('opacity-value').textContent = e.target.value;
+        });
+      }
+      
+      const sideEl = document.getElementById('prop-side');
+      if (sideEl) {
+        sideEl.addEventListener('change', (e) => {
+          selectedObject.material.side = e.target.value;
+        });
+      }
+      
+      const visibleEl = document.getElementById('prop-visible');
+      if (visibleEl) {
+        visibleEl.addEventListener('change', (e) => {
+          selectedObject.material.visible = e.target.checked;
+        });
+      }
+      
+      const depthWriteEl = document.getElementById('prop-depthWrite');
+      if (depthWriteEl) {
+        depthWriteEl.addEventListener('change', (e) => {
+          selectedObject.material.depthWrite = e.target.checked;
+        });
+      }
+      
+      // Material-specific properties
+      const colorEl = document.getElementById('prop-color');
+      if (colorEl) {
+        colorEl.addEventListener('input', (e) => {
+          const color = hexToRgb(e.target.value);
+          selectedObject.material.color.setRGB(color.r, color.g, color.b);
+        });
+      }
+      
+      const emissiveEl = document.getElementById('prop-emissive');
+      if (emissiveEl) {
+        emissiveEl.addEventListener('input', (e) => {
+          const color = hexToRgb(e.target.value);
+          selectedObject.material.emissive.setRGB(color.r, color.g, color.b);
+        });
+      }
+      
+      const emissiveIntensityEl = document.getElementById('prop-emissive-intensity');
+      if (emissiveIntensityEl) {
+        emissiveIntensityEl.addEventListener('input', (e) => {
+          selectedObject.material.emissiveIntensity = parseFloat(e.target.value);
+          document.getElementById('emissive-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+      }
+      
+      // PBR-specific properties
+      const metallicEl = document.getElementById('prop-metallic');
+      if (metallicEl) {
+        metallicEl.addEventListener('input', (e) => {
+          selectedObject.material.metallic = parseFloat(e.target.value);
+          document.getElementById('metallic-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+      }
+      
+      const roughnessEl = document.getElementById('prop-roughness');
+      if (roughnessEl) {
+        roughnessEl.addEventListener('input', (e) => {
+          selectedObject.material.roughness = parseFloat(e.target.value);
+          document.getElementById('roughness-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+      }
+      
+      const normalScaleEl = document.getElementById('prop-normal-scale');
+      if (normalScaleEl) {
+        normalScaleEl.addEventListener('input', (e) => {
+          selectedObject.material.normalScale = parseFloat(e.target.value);
+          document.getElementById('normal-scale-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+      }
+      
+      const aoIntensityEl = document.getElementById('prop-ao-intensity');
+      if (aoIntensityEl) {
+        aoIntensityEl.addEventListener('input', (e) => {
+          selectedObject.material.aoMapIntensity = parseFloat(e.target.value);
+          document.getElementById('ao-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+      }
+      
+      const debugModeEl = document.getElementById('prop-debug-mode');
+      if (debugModeEl) {
+        debugModeEl.addEventListener('change', (e) => {
+          selectedObject.material.mode = e.target.value;
+        });
+      }
+      
+      // Texture map selection
+      const mapEl = document.getElementById('prop-map');
+      if (mapEl) {
+        mapEl.addEventListener('change', (e) => {
+          const value = e.target.value;
+          if (value === 'none') {
+            selectedObject.material.map = null;
+          } else {
+            selectedObject.material.map = createProceduralTexture(value);
+          }
+        });
+      }
+    }
+
+    function createProceduralTexture(type) {
+      switch(type) {
+        case 'checker':
+          return textureLoader.createCheckerTexture(256, 8);
+        case 'uvtest':
+          return textureLoader.createUVTestTexture(256);
+        case 'grid':
+          return textureLoader.createGridTexture(256, 32, 2);
+        case 'wood':
+          return textureLoader.createWoodTexture(512);
+        case 'brick':
+          return textureLoader.createBrickTexture(512);
+        case 'noise':
+          return textureLoader.createNoiseTexture(256, 10, 12345);
+        case 'gradient':
+          return textureLoader.createGradientTexture(256, 'linear', {r: 0, g: 0, b: 0}, {r: 1, g: 1, b: 1});
+        default:
+          return null;
+      }
+    }
+
+    function changeMaterialType(type) {
+      if (!selectedObject) return;
+      
+      const oldMaterial = selectedObject.material;
+      let newMaterial;
+      
+      switch(type) {
+        case 'basic':
+          newMaterial = new BasicMaterial({ 
+            color: oldMaterial.color ? oldMaterial.color.getHex() : 0x3b82f6
+          });
+          break;
+        case 'lambert':
+          newMaterial = new LambertMaterial({ 
+            color: oldMaterial.color ? oldMaterial.color.getHex() : 0x3b82f6
+          });
+          break;
+        case 'pbr':
+          newMaterial = new PBRMaterial({ 
+            color: oldMaterial.color ? oldMaterial.color.getHex() : 0x3b82f6
+          });
+          break;
+        case 'debug':
+          newMaterial = new DebugMaterial({ 
+            mode: 'normals'
+          });
+          break;
+      }
+      
+      // Copy common properties
+      newMaterial.transparent = oldMaterial.transparent;
+      newMaterial.opacity = oldMaterial.opacity;
+      newMaterial.side = oldMaterial.side;
+      newMaterial.visible = oldMaterial.visible;
+      newMaterial.depthWrite = oldMaterial.depthWrite;
+      
+      selectedObject.material = newMaterial;
+      updateMaterialInspector();
+    }
+
+    function rgbToHex(color) {
+      const r = Math.floor(color.r * 255);
+      const g = Math.floor(color.g * 255);
+      const b = Math.floor(color.b * 255);
+      return '#' + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('');
+    }
+
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16) / 255,
+        g: parseInt(result[2], 16) / 255,
+        b: parseInt(result[3], 16) / 255
+      } : { r: 1, g: 1, b: 1 };
+    }
+
+    function updateStats() {
+      document.getElementById('object-count').textContent = objects.length;
+    }
+
+    function exportMaterialJSON() {
+      if (!selectedObject) {
+        alert('Please select an object first');
+        return;
+      }
+      
+      const json = materialSerializer.serializeMaterial(selectedObject.material);
+      const jsonString = JSON.stringify(json, null, 2);
+      document.getElementById('json-output').value = jsonString;
+    }
+
+    function importMaterialJSON() {
+      const jsonString = document.getElementById('json-output').value.trim();
+      if (!jsonString) {
+        alert('Please paste JSON into the text area first');
+        return;
+      }
+      
+      if (!selectedObject) {
+        alert('Please select an object to apply the material to');
+        return;
+      }
+      
+      try {
+        const json = JSON.parse(jsonString);
+        const material = materialSerializer.deserializeMaterial(json);
+        if (material) {
+          selectedObject.material = material;
+          updateMaterialInspector();
+          alert('Material imported successfully!');
+        } else {
+          alert('Failed to import material');
+        }
+      } catch (error) {
+        alert('Invalid JSON: ' + error.message);
+      }
+    }
+
+    function exportMaterialLibrary() {
+      if (objects.length === 0) {
+        alert('No objects in scene');
+        return;
+      }
+      
+      const materials = objects.map(obj => obj.material);
+      const jsonString = materialSerializer.exportLibrary(materials);
+      document.getElementById('json-output').value = jsonString;
+      alert(`Exported ${materials.length} materials to library`);
+    }
+
+    function onWindowResize() {
+      const canvas = document.getElementById('canvas');
+      const width = canvas.parentElement.clientWidth;
+      const height = canvas.parentElement.clientHeight;
+      
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      
+      renderer.setSize(width, height);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Calculate FPS
+      frameCount++;
+      const now = Date.now();
+      if (now - lastTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = now;
+        document.getElementById('fps-counter').textContent = fps;
+      }
+      
+      // Rotate objects slightly for visual interest
+      objects.forEach((obj, i) => {
+        obj.rotation.y += 0.005;
+        obj.rotation.x += 0.002;
+      });
+      
+      // Render
+      renderer.render(scene, camera);
+    }
+
+    // Start
+    init().catch(err => {
+      console.error('Failed to initialize:', err);
+      alert('Failed to initialize renderer. Check console for details.');
+    });
+  </script>
+</body>
+</html>

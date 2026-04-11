@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3d - Basic Cube Example</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 5px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    
+    #canvas {
+      display: block;
+      margin: 0;
+    }
+    
+    h1 {
+      margin: 0 0 5px 0;
+      font-size: 18px;
+      color: #4a9eff;
+    }
+    
+    p {
+      margin: 3px 0;
+      font-size: 12px;
+      color: #ccc;
+    }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      display: flex;
+      gap: 8px;
+    }
+    
+    #controls button {
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    
+    #controls button:hover {
+      background: #3a3a3a;
+      border-color: #666;
+    }
+    
+    #controls button.active {
+      background: #4a9eff;
+      border-color: #4a9eff;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="btnCPU">CPU</button>
+    <button id="btnGPU" class="active">GPU</button>
+    <button id="btnAuto">Auto</button>
+  </div>
+  
+  <div id="info">
+    <h1>BangBang3d: Basic Cube</h1>
+    <p id="backend">Backend: --</p>
+    <p id="fps">FPS: --</p>
+    <p>Software rasterization with Z-buffer</p>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      BasicMaterial,
+      PerspectiveCamera,
+      BangBangRenderer
+    } from '../../src/index.js';
+    
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // Global variables
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let cube = null;
+    let animationId = null;
+    
+    // FPS counter variables
+    let lastTime = performance.now();
+    let frames = 0;
+    let fps = 0;
+
+    // Initialize renderer with specified backend
+    async function initRenderer(backendType) {
+      // Dispose old renderer if it exists
+      if (renderer) {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
+        renderer.dispose();
+        renderer = null;
+      }
+
+      console.log(`Initializing ${backendType} backend...`);
+
+      // Important: Replace the canvas element to clear WebGPU context
+      const oldCanvas = document.getElementById('canvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      
+      // Create renderer with specified backend
+      renderer = new BangBangRenderer({
+        canvas: newCanvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: backendType
+      });
+
+      // Wait for initialization
+      await renderer.initialize();
+      
+      renderer.setClearColor(0x1a1a2e);
+      
+      console.log('Backend initialized:', renderer.backendType);
+      
+      // Update UI
+      document.getElementById('backend').textContent = `Backend: ${renderer.backendType.toUpperCase()}`;
+
+      // Recreate controls with new canvas
+      if (controls) {
+        controls.dispose();
+      }
+      controls = new OrbitControls(camera, newCanvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(0, 0, 0);
+
+      // Start animation loop
+      if (!animationId) {
+        animate(performance.now());
+      }
+    }
+
+    // Create scene and objects (called once at startup)
+    function createScene() {
+      // Create scene
+      scene = new Scene();
+
+      // Create camera
+      camera = new PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.5,
+        100
+      );
+      camera.position.set(0, 0, 3);
+
+      // Create a red cube
+      const geometry = new BoxGeometry(1, 1, 1);
+      const material = new BasicMaterial({ color: 0xff3366 });
+      cube = new Mesh(geometry, material);
+      cube.rotation.set(0.3, 0.4, 0); // Initial rotation so faces are visible
+      scene.add(cube);
+      
+      console.log('Scene triangles:', geometry.index ? geometry.index.count / 3 : geometry.getAttribute('position').count / 3);
+    }
+
+    // Animation loop
+    function animate(currentTime) {
+      animationId = requestAnimationFrame(animate);
+
+      // Update FPS counter
+      frames++;
+      if (currentTime >= lastTime + 1000) {
+        fps = frames;
+        frames = 0;
+        lastTime = currentTime;
+        document.getElementById('fps').textContent = `FPS: ${fps}`;
+      }
+
+      // Update controls
+      controls.update();
+
+      // Render scene
+      renderer.render(scene, camera);
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    // Backend selection buttons
+    document.getElementById('btnCPU').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnCPU').classList.add('active');
+      await initRenderer('cpu');
+    });
+
+    document.getElementById('btnGPU').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnGPU').classList.add('active');
+      await initRenderer('gpu');
+    });
+
+    document.getElementById('btnAuto').addEventListener('click', async () => {
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnAuto').classList.add('active');
+      await initRenderer('auto');
+    });
+
+    // Create scene once at startup
+    createScene();
+    
+    // Initialize with GPU backend by default
+    initRenderer('gpu');
+
+    console.log('BangBang3d Basic Cube Example');
+    console.log('Use mouse to orbit camera - Left click: rotate, Right click: pan, Scroll: zoom');
+  </script>
+</body>
+</html>

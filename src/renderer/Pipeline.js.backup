@@ -1,0 +1,316 @@
+import { Vector3 } from '../math/Vector3.js';
+import { Vector4 } from '../math/Vector4.js';
+import { Matrix4 } from '../math/Matrix4.js';
+import { ClipSpace } from './ClipSpace.js';
+import { Rasterizer } from './Rasterizer.js';
+import { Shading } from './Shading.js';
+import { NearPlaneClipper } from './NearPlaneClipper.js';
+
+/**
+ * Pipeline - Orchestrates the full rendering pipeline
+ */
+export class Pipeline {
+  constructor(frameBuffer, depthBuffer) {
+    this.frameBuffer = frameBuffer;
+    this.depthBuffer = depthBuffer;
+    this.rasterizer = new Rasterizer();
+
+    // Rendering statistics
+    this.stats = {
+      trianglesSubmitted: 0,
+      trianglesClippedOut: 0,
+      trianglesClippedNear: 0,
+      trianglesCulled: 0,
+      trianglesRendered: 0
+    };
+
+    // Scratch variables to avoid allocations
+    this._mvpMatrix = new Matrix4();
+    this._modelViewMatrix = new Matrix4();
+    this._normalMatrix = new Matrix4();
+    this._ndcV0 = new Vector3();
+    this._ndcV1 = new Vector3();
+    this._ndcV2 = new Vector3();
+    this._screenV0 = new Vector3();
+    this._screenV1 = new Vector3();
+    this._screenV2 = new Vector3();
+  }
+
+  /**
+   * Render a mesh with the given camera and lights
+   */
+  renderMesh(mesh, camera, lights) {
+    const geometry = mesh.geometry;
+    const material = mesh.material;
+
+    if (!geometry || !material) return;
+
+    const positions = geometry.getAttribute('position');
+    const normals = geometry.getAttribute('normal');
+    const uvs = geometry.getAttribute('uv');
+    const index = geometry.index;
+
+    if (!positions) return;
+
+    // Update matrices
+    mesh.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+
+    // Calculate MVP matrix
+    this._modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, mesh.matrixWorld);
+    this._mvpMatrix.multiplyMatrices(camera.projectionMatrix, this._modelViewMatrix);
+
+    // Calculate normal matrix (for transforming normals)
+    this._normalMatrix.copy(mesh.matrixWorld);
+    this._normalMatrix.extractRotation(mesh.matrixWorld);
+
+    // Get triangle count
+    const triangleCount = index ? index.count / 3 : positions.count / 3;
+    
+    let culledCount = 0;
+    let clippedCount = 0;
+    let renderedCount = 0;
+
+    // Process each triangle
+    for (let i = 0; i < triangleCount; i++) {
+      // Get vertex indices
+      let i0, i1, i2;
+      if (index) {
+        i0 = index.getX(i * 3 + 0);
+        i1 = index.getX(i * 3 + 1);
+        i2 = index.getX(i * 3 + 2);
+      } else {
+        i0 = i * 3 + 0;
+        i1 = i * 3 + 1;
+        i2 = i * 3 + 2;
+      }
+
+      // Get vertex positions
+      const v0 = new Vector3(positions.getX(i0), positions.getY(i0), positions.getZ(i0));
+      const v1 = new Vector3(positions.getX(i1), positions.getY(i1), positions.getZ(i1));
+      const v2 = new Vector3(positions.getX(i2), positions.getY(i2), positions.getZ(i2));
+
+      // Transform to clip space
+      ClipSpace.toClipSpace(v0, this._mvpMatrix, this._clipV0);
+      ClipSpace.toClipSpace(v1, this._mvpMatrix, this._clipV1);
+      ClipSpace.toClipSpace(v2, this._mvpMatrix, this._clipV2);
+
+      // Near plane clipping - discard only if ALL vertices are behind near plane
+      // This prevents entire triangles from disappearing when partially clipped
+      const v0Behind = !ClipSpace.isInFrontOfNear(this._clipV0, camera.near);
+      const v1Behind = !ClipSpace.isInFrontOfNear(this._clipV1, camera.near);
+      const v2Behind = !ClipSpace.isInFrontOfNear(this._clipV2, camera.near);
+      
+      if (v0Behind && v1Behind && v2Behind) {
+        clippedCount++;
+        continue;
+      }
+
+      // Perspective divide to NDC (with near-plane guards)
+      ClipSpace.toNDC(this._clipV0, this._ndcV0, camera.near);
+      ClipSpace.toNDC(this._clipV1, this._ndcV1, camera.near);
+      ClipSpace.toNDC(this._clipV2, this._ndcV2, camera.near);
+
+      // Skip triangles with invalid coordinates (vertices behind near plane)
+      // This prevents "infinite projection" artifacts from warped perspective division
+      if (!isFinite(this._ndcV0.x) || !isFinite(this._ndcV1.x) || !isFinite(this._ndcV2.x)) {
+        clippedCount++;
+        continue;
+      }
+
+      // Transform to screen space
+      ClipSpace.toScreenSpace(this._ndcV0, this.frameBuffer.width, this.frameBuffer.height, this._screenV0);
+      ClipSpace.toScreenSpace(this._ndcV1, this.frameBuffer.width, this.frameBuffer.height, this._screenV1);
+      ClipSpace.toScreenSpace(this._ndcV2, this.frameBuffer.width, this.frameBuffer.height, this._screenV2);
+      // Prepare vertex data for rasterizer
+      const vertex0 = {
+        position: this._screenV0.clone(),
+        w: this._clipV0.w,
+        clipZ: this._clipV0.z,  // Store clip-space Z for proper depth calculation
+        worldPosition: v0.clone().applyMatrix4(mesh.matrixWorld)
+      };
+      const vertex1 = {
+        position: this._screenV1.clone(),
+        w: this._clipV1.w,
+        clipZ: this._clipV1.z,  // Store clip-space Z for proper depth calculation
+        worldPosition: v1.clone().applyMatrix4(mesh.matrixWorld)
+      };
+      const vertex2 = {
+        position: this._screenV2.clone(),
+        w: this._clipV2.w,
+        clipZ: this._clipV2.z,  // Store clip-space Z for proper depth calculation
+        worldPosition: v2.clone().applyMatrix4(mesh.matrixWorld)
+      };
+
+      // Add normals if available
+      if (normals) {
+        vertex0.normal = new Vector3(normals.getX(i0), normals.getY(i0), normals.getZ(i0));
+        vertex1.normal = new Vector3(normals.getX(i1), normals.getY(i1), normals.getZ(i1));
+        vertex2.normal = new Vector3(normals.getX(i2), normals.getY(i2), normals.getZ(i2));
+
+        // Transform normals to world space and normalize
+        vertex0.normal.transformDirection(this._normalMatrix).normalize();
+        vertex1.normal.transformDirection(this._normalMatrix).normalize();
+        vertex2.normal.transformDirection(this._normalMatrix).normalize();
+      }
+
+      // Add UVs if available
+      if (uvs) {
+        vertex0.uv = { x: uvs.getX(i0), y: uvs.getY(i0) };
+        vertex1.uv = { x: uvs.getX(i1), y: uvs.getY(i1) };
+        vertex2.uv = { x: uvs.getX(i2), y: uvs.getY(i2) };
+      }
+
+      // Create fragment shader based on material type
+      const fragmentShader = this.createFragmentShader(material, lights);
+
+      // Rasterize triangle
+      const shouldCullBackface = material.side !== 'DoubleSide';
+      this.rasterizer.rasterizeTriangle(
+        vertex0,
+        vertex1,
+        vertex2,
+        this.frameBuffer,
+        this.depthBuffer,
+        fragmentShader,
+        {
+          cullBackface: shouldCullBackface,
+          depthTest: material.depthTest
+        }
+      );
+      renderedCount++;
+    }
+  }
+
+  /**
+   * Create a fragment shader function based on material type
+   */
+  createFragmentShader(material, lights) {
+    if (material.type === 'DebugMaterial') {
+      // Debug material - visualize normals, depth, UVs, etc.
+      return (bary, v0, v1, v2, invW0, invW1, invW2) => {
+        const data = {};
+        
+        // Interpolate normal if available
+        if (v0.normal) {
+          data.normal = Rasterizer.interpolateVector3(
+            bary.u, bary.v, bary.w,
+            v0.normal, v1.normal, v2.normal,
+            invW0, invW1, invW2
+          );
+        }
+        
+        // Calculate depth (average of vertex depths)
+        data.depth = (v0.position.z * bary.u + v1.position.z * bary.v + v2.position.z * bary.w);
+        
+        // Interpolate UV if available
+        if (v0.uv && v1.uv && v2.uv) {
+          data.uv = Rasterizer.interpolateUV(
+            bary.u, bary.v, bary.w,
+            v0.uv, v1.uv, v2.uv,
+            invW0, invW1, invW2
+          );
+        }
+        
+        // Interpolate world position for worldPosition debug mode
+        if (v0.worldPosition && v1.worldPosition && v2.worldPosition) {
+          data.worldPosition = Rasterizer.interpolateVector3(
+            bary.u, bary.v, bary.w,
+            v0.worldPosition, v1.worldPosition, v2.worldPosition,
+            invW0, invW1, invW2
+          );
+        }
+        
+        // Get debug color based on mode
+        const tempColor = { r: 0, g: 0, b: 0 };
+        material.getDebugColor(material.mode, data, tempColor);
+        
+        return {
+          r: tempColor.r,
+          g: tempColor.g,
+          b: tempColor.b,
+          a: 1.0
+        };
+      };
+    } else if (material.isBasicMaterial) {
+      return (bary, v0, v1, v2, invW0, invW1, invW2) => {
+        let finalColor = { r: material.color.r, g: material.color.g, b: material.color.b };
+
+        // Apply texture if present
+        if (material.map && material.map.data && v0.uv && v1.uv && v2.uv) {
+          // Perspective-correct UV interpolation
+          const uv = Rasterizer.interpolateUV(
+            bary.u, bary.v, bary.w,
+            v0.uv, v1.uv, v2.uv,
+            invW0, invW1, invW2
+          );
+
+          // Sample texture
+          const texColor = material.map.sample(uv.x, uv.y);
+
+          // Multiply texture color with material color
+          finalColor.r *= texColor.r;
+          finalColor.g *= texColor.g;
+          finalColor.b *= texColor.b;
+        }
+
+        return {
+          r: finalColor.r,
+          g: finalColor.g,
+          b: finalColor.b,
+          a: material.opacity
+        };
+      };
+    } else if (material.isLambertMaterial) {
+      return (bary, v0, v1, v2, invW0, invW1, invW2) => {
+        // Get base color
+        let baseColor = { r: material.color.r, g: material.color.g, b: material.color.b };
+
+        // Apply texture if present
+        if (material.map && material.map.data && v0.uv && v1.uv && v2.uv) {
+          // Perspective-correct UV interpolation
+          const uv = Rasterizer.interpolateUV(
+            bary.u, bary.v, bary.w,
+            v0.uv, v1.uv, v2.uv,
+            invW0, invW1, invW2
+          );
+
+          // Sample texture
+          const texColor = material.map.sample(uv.x, uv.y);
+
+          // Multiply texture color with material color
+          baseColor.r *= texColor.r;
+          baseColor.g *= texColor.g;
+          baseColor.b *= texColor.b;
+        }
+
+        // Interpolate normal (perspective-correct)
+        const normal = Rasterizer.interpolateVector3(
+          bary.u, bary.v, bary.w,
+          v0.normal, v1.normal, v2.normal,
+          invW0, invW1, invW2
+        );
+        normal.normalize(); // Normalize after interpolation
+
+        // Calculate lighting with textured base color
+        const litColor = Shading.lambert(
+          { r: baseColor.r, g: baseColor.g, b: baseColor.b },
+          normal,
+          lights,
+          material.emissive,
+          material.emissiveIntensity
+        );
+
+        return {
+          r: litColor.r,
+          g: litColor.g,
+          b: litColor.b,
+          a: material.opacity
+        };
+      };
+    }
+
+    // Fallback: magenta for unknown materials
+    return () => ({ r: 1, g: 0, b: 1, a: 1 });
+  }
+}

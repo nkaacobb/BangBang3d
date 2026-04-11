@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3d - Dual-Backend 3D Rendering Engine</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      color: #e0e0e0;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    header {
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      border-bottom: 2px solid #ff6b35;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.8rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo-icon {
+      height: 64px;
+      width: auto;
+      display: block;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: #e0e0e0;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.3s;
+      position: relative;
+    }
+
+    .nav-links a:hover {
+      color: #ff6b35;
+    }
+
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 2px;
+      bottom: -5px;
+      left: 0;
+      background: #ff6b35;
+      transition: width 0.3s;
+    }
+
+    .nav-links a:hover::after {
+      width: 100%;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 6rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .hero h1 {
+      margin-bottom: 1rem;
+      animation: fadeInDown 1s ease;
+    }
+
+    .hero-logo {
+      max-width: 500px;
+      width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .hero .subtitle {
+      font-size: 1.5rem;
+      color: #b0b0b0;
+      margin-bottom: 2rem;
+      animation: fadeInUp 1s ease 0.2s both;
+    }
+
+    .hero .tagline {
+      font-size: 1.1rem;
+      color: #888;
+      margin-bottom: 3rem;
+      animation: fadeInUp 1s ease 0.4s both;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin: 3rem 0;
+      animation: fadeInUp 1s ease 0.6s both;
+    }
+
+    .feature-badge {
+      background: rgba(255, 107, 53, 0.1);
+      border: 1px solid #ff6b35;
+      padding: 0.8rem 1.5rem;
+      border-radius: 25px;
+      font-weight: 500;
+      color: #ff6b35;
+      transition: all 0.3s;
+    }
+
+    .feature-badge:hover {
+      background: rgba(255, 107, 53, 0.2);
+      transform: translateY(-3px);
+    }
+
+    /* Examples Section */
+    .section {
+      max-width: 1400px;
+      margin: 4rem auto;
+      padding: 2rem;
+    }
+
+    .section h2 {
+      font-size: 2.5rem;
+      margin-bottom: 2rem;
+      color: #ff6b35;
+      text-align: center;
+    }
+
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+    }
+
+    .example-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 107, 53, 0.3);
+      border-radius: 10px;
+      padding: 2rem;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .example-card:hover {
+      transform: translateY(-5px);
+      border-color: #ff6b35;
+      box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
+    }
+
+    .example-card h3 {
+      color: #ff6b35;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+
+    .example-card p {
+      color: #b0b0b0;
+      margin-bottom: 1.5rem;
+    }
+
+    .example-card a {
+      display: inline-block;
+      background: #ff6b35;
+      color: #fff;
+      padding: 0.7rem 1.5rem;
+      border-radius: 5px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+
+    .example-card a:hover {
+      background: #f7931e;
+    }
+
+    /* Documentation Section */
+    .doc-section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 107, 53, 0.2);
+      border-radius: 10px;
+      padding: 2rem;
+      margin: 2rem 0;
+    }
+
+    .doc-tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      border-bottom: 2px solid rgba(255, 107, 53, 0.3);
+      padding-bottom: 1rem;
+    }
+
+    .doc-tab {
+      padding: 0.7rem 1.5rem;
+      background: transparent;
+      border: 1px solid rgba(255, 107, 53, 0.3);
+      color: #e0e0e0;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+
+    .doc-tab:hover {
+      border-color: #ff6b35;
+      background: rgba(255, 107, 53, 0.1);
+    }
+
+    .doc-tab.active {
+      background: #ff6b35;
+      border-color: #ff6b35;
+      color: #fff;
+    }
+
+    .doc-content {
+      display: none;
+      animation: fadeIn 0.5s ease;
+    }
+
+    .doc-content.active {
+      display: block;
+    }
+
+    .doc-content iframe {
+      width: 100%;
+      height: 600px;
+      border: 1px solid rgba(255, 107, 53, 0.3);
+      border-radius: 5px;
+      background: #0a0a0a;
+    }
+
+    /* Quick Start */
+    .quick-start {
+      background: rgba(255, 107, 53, 0.05);
+      border-left: 4px solid #ff6b35;
+      padding: 2rem;
+      margin: 2rem 0;
+      border-radius: 5px;
+    }
+
+    .quick-start h3 {
+      color: #ff6b35;
+      margin-bottom: 1rem;
+    }
+
+    pre {
+      background: #0a0a0a;
+      border: 1px solid rgba(255, 107, 53, 0.3);
+      padding: 1.5rem;
+      border-radius: 5px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    code {
+      color: #f7931e;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      margin-top: 4rem;
+      border-top: 1px solid rgba(255, 107, 53, 0.3);
+      color: #888;
+    }
+
+    /* Animations */
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2.5rem;
+      }
+      
+      .hero .subtitle {
+        font-size: 1.2rem;
+      }
+
+      .nav-links {
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .features {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Scroll to top button */
+    .scroll-top {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #ff6b35;
+      color: #fff;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 999;
+      font-size: 1.5rem;
+    }
+
+    .scroll-top.visible {
+      opacity: 1;
+    }
+
+    .scroll-top:hover {
+      transform: translateY(-5px);
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <nav>
+      <div class="logo">
+        <img src="BangBang3d-logo-sm.png" alt="" class="logo-icon">
+        BangBang3d
+      </div>
+      <ul class="nav-links">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#examples">Examples</a></li>
+        <li><a href="#documentation">Documentation</a></li>
+        <li><a href="#quickstart">Quick Start</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Hero Section -->
+  <section id="home" class="hero">
+    <h1>
+      <img src="BangBang3d-logo.png" alt="BangBang3d" class="hero-logo">
+    </h1>
+    <div class="subtitle">Dual-Backend 3D Rendering Engine</div>
+    <div class="tagline">CPU software rasterization or GPU acceleration. Your choice.</div>
+    
+    <div class="features">
+      <div class="feature-badge">🎨 Dual Backend (CPU + GPU)</div>
+      <div class="feature-badge">🔍 100% Inspectable</div>
+      <div class="feature-badge">🎯 Deterministic CPU Path</div>
+      <div class="feature-badge">📚 Educational</div>
+      <div class="feature-badge">⚡ GPU Performance</div>
+    </div>
+  </section>
+
+  <!-- Examples Section -->
+  <section id="examples" class="section">
+    <h2>Live Examples</h2>
+    
+    <h3 style="color: #ff6b35; margin: 2rem 0 1rem 0; font-size: 1.8rem;">Core Examples</h3>
+    <div class="examples-grid">
+      <div class="example-card">
+        <h3>Basic Cube</h3>
+        <p>A rotating red cube demonstrating the fundamentals of 3D rendering with OrbitControls for interactive camera manipulation.</p>
+        <a href="examples/basic-cube/index.html" target="_blank">Launch Demo →</a>
+      </div>
+
+      <div class="example-card">
+        <h3>Diffuse Lighting</h3>
+        <p>Multi-light scene showcasing Lambert shading with ambient and directional lights on a cube and ground plane.</p>
+        <a href="examples/lights/index.html" target="_blank">Launch Demo →</a>
+      </div>
+
+      <div class="example-card">
+        <h3>Texture Mapping</h3>
+        <p>Procedural texture generation and UV mapping with multiple texture types: checker, grid, wood, and brick patterns.</p>
+        <a href="examples/textured/index.html" target="_blank">Launch Demo →</a>
+      </div>
+
+      <div class="example-card">
+        <h3>Materials Playground</h3>
+        <p>Interactive material editor with live property editing, 7 procedural texture generators (checker, UV test, grid, wood, brick, noise, gradient), and JSON import/export for material libraries.</p>
+        <a href="examples/materials-playground/index.html" target="_blank">Launch Demo →</a>
+      </div>
+
+      <div class="example-card">
+        <h3>Debug Views</h3>
+        <p>Interactive visualization modes showing normals, depth buffer, UV coordinates, and world positions for pipeline inspection.</p>
+        <a href="examples/debug-views/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Multi Camera</h3>
+        <p>Multiple camera views with runtime switching to compare perspectives and camera behavior.</p>
+        <a href="examples/multicamera/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Grid Gizmo & Object Manipulation</h3>
+        <p>Interactive 3D scene with Blender-style grid overlay, raycaster object picking, selection highlighting, and constrained axis-aligned dragging.</p>
+        <a href="examples/grid-gizmo/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Lighting Playground</h3>
+        <p>Interactive lighting demonstration with five light types (point, spot, directional, hemisphere, ambient). Features real-time property editing, light helpers, picking/dragging, and spatial inspector visualization.</p>
+        <a href="examples/light-playground/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Glass & Transparency</h3>
+        <p>Alpha blending and transparent materials with proper depth sorting for realistic glass effects and see-through objects.</p>
+        <a href="examples/glass/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Physics Cube</h3>
+        <p>Real-time physics simulation with bouncing balls inside a rotatable glass cube. Demonstrates cube-local gravity using quaternion inversion.</p>
+        <a href="examples/physics-cube/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Model Viewer (OBJ/MTL)</h3>
+        <p>Load and render Wavefront OBJ models with MTL materials and textures. Supports auto-centering, scaling, and interactive camera controls.</p>
+        <a href="examples/models/index.html" target="_blank">Launch Demo →</a>
+      </div>
+    </div>
+    
+    <h3 style="color: #ff6b35; margin: 3rem 0 1rem 0; font-size: 1.8rem;">Advanced Examples</h3>
+    <div class="examples-grid">
+      <div class="example-card">
+        <h3>Backend Selection + GPU Rendering</h3>
+        <p>Demonstrates backend selection (cpu | gpu | auto), GPU rendering parity, adding geometry, transparency, rotation, and runtime stats.</p>
+        <a href="examples/backend-selection-gpu-rendering/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Post Processing: Tone Mapping + FXAA</h3>
+        <p>Post-processing controls with tone mapping operators (ACES, Reinhard, Linear), exposure adjustment, gamma correction, and FXAA anti-aliasing.</p>
+        <a href="examples/post-processing-tonemapping-fxaa/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>PBR Lighting + Shadows</h3>
+        <p>Physically-based rendering materials (metallic/roughness workflow), multiple light types (directional, point, spot), and shadow map support.</p>
+        <a href="examples/pbr-lighting-shadows/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Reflections Playground</h3>
+        <p>Dynamic reflection probes with cubemap capture and image-based lighting. Explore real-time environment reflections on PBR materials.</p>
+        <a href="examples/reflections-playground/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Point Cloud Viewer</h3>
+        <p>Renders point cloud data with configurable point size, color modes, and performance-optimized instanced rendering. Loads PLY, XYZ, and XYZRGB formats.</p>
+        <a href="examples/point-cloud-viewer/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Gaussian Splats</h3>
+        <p>Real-time 3D Gaussian Splatting renderer with depth-sorted alpha blending, SH color evaluation, and interactive camera controls.</p>
+        <a href="examples/gaussian-splats/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card" style="border-color: rgba(126, 231, 135, 0.5);">
+        <h3>Path Tracer <span style="font-size: 0.8em; color: #7ee787;">🔆 WebGPU</span></h3>
+        <p>Production-grade progressive path tracer using WebGPU compute shaders. Features BVH acceleration, PBR materials (GGX/Fresnel), NEE+MIS lighting, à-trous denoising, and debug views. Includes Cornell Box and PBR playground scenes.</p>
+        <a href="examples/path-tracer/index.html" target="_blank" style="background: linear-gradient(135deg, #238636, #1a7f37);">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card">
+        <h3>Dither Viewer <span style="font-size: 0.8em; color: #ffd700;">✦ PostFX</span></h3>
+        <p>Retro "Classic Mac OS / MacPaint" ordered-dithering post-processing effect. Features 4×4 and 8×8 Bayer matrices, per-camera PostFX pipeline, strength/bias/invert controls, and MacPaint preset.</p>
+        <a href="examples/dither-viewer/index.html" target="_blank">Launch Demo →</a>
+      </div>
+      
+      <div class="example-card" style="border-color: rgba(255, 107, 53, 0.5); opacity: 0.85;">
+        <h3>Advanced Features Dashboard <span style="font-size: 0.8em; color: #f7931e;">(UI Mock)</span></h3>
+        <p style="font-style: italic;">UI/dashboard prototype showcasing planned Phase 5 features. This is a placeholder interface and not a real BangBang3D engine example.</p>
+        <a href="examples/advanced-features-dashboard-mock/index.html" target="_blank" style="background: #666;">View Prototype →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Start Section -->
+  <section id="quickstart" class="section">
+    <h2>Quick Start</h2>
+    
+    <div class="quick-start">
+      <h3>Using BangBang3d in Your Application</h3>
+      <p><strong>Method 1: Import from Web Server</strong></p>
+      <pre><code>&lt;script type="module"&gt;
+  import {
+    Scene, Mesh, BoxGeometry, BasicMaterial,
+    PerspectiveCamera, BangBangRenderer
+  } from 'http://127.0.0.1/repo/Projects/Utilities/BangBang3d/src/index.js';
+
+  const canvas = document.getElementById('canvas');
+  const renderer = new BangBangRenderer({ canvas, width: 800, height: 600 });
+  const scene = new Scene();
+  const camera = new PerspectiveCamera(75, 800/600, 0.1, 100);
+  camera.position.z = 5;
+
+  const cube = new Mesh(
+    new BoxGeometry(1, 1, 1),
+    new BasicMaterial({ color: 0xff0000 })
+  );
+  scene.add(cube);
+
+  function animate() {
+    cube.rotation.x += 0.01;
+    cube.rotation.y += 0.01;
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+&lt;/script&gt;</code></pre>
+
+      <p><strong>Method 2: Run Local Development Server</strong></p>
+      <pre><code>cd d:\Repo\Projects\Utilities\BangBang3d
+python -m http.server 8000
+
+# Open http://localhost:8000/examples/basic-cube/</code></pre>
+    </div>
+  </section>
+
+  <!-- Documentation Section -->
+  <section id="documentation" class="section">
+    <h2>Documentation</h2>
+    
+    <div class="doc-section">
+      <div class="doc-tabs">
+        <button class="doc-tab active" onclick="switchTab('readme')">README</button>
+        <button class="doc-tab" onclick="switchTab('implementation')">Implementation Guide</button>
+        <button class="doc-tab" onclick="switchTab('specification')">Specification</button>
+      </div>
+
+      <div id="readme" class="doc-content active">
+        <iframe src="README.md" framebordeith dual-backend architecture
+      </div>
+
+      <div id="implementation" class="doc-content">
+        <iframe src="IMPLEMENTATION.md" frameborder="0"></iframe>
+      </div>
+
+      <div id="specification" class="doc-content">
+        <iframe src="BangBang3d Specification.md" frameborder="0"></iframe>
+      </div>
+    </div>
+
+    <div class="quick-start">
+      <h3>Key Features</h3>
+      <ul style="margin-left: 2rem; color: #b0b0b0;">
+        <li><strong>Complete Pipeline:</strong> Scene graph, transforms, lighting, rasterization, depth testing</li>
+        <li><strong>Math Library:</strong> Vector2/3/4, Matrix4, Quaternion, Euler, Color</li>
+        <li><strong>Materials:</strong> BasicMaterial (flat), LambertMaterial (diffuse), DebugMaterial (visualization)</li>
+        <li><strong>Geometry:</strong> BoxGeometry, PlaneGeometry with BufferAttribute system</li>
+        <li><strong>Lighting:</strong> AmbientLight, DirectionalLight with CPU-based shading</li>
+        <li><strong>Textures:</strong> Procedural generation, UV mapping, filtering, wrapping modes</li>
+        <li><strong>Controls:</strong> OrbitControls for interactive camera manipulation</li>
+        <li><strong>Debug Tools:</strong> Stats monitoring, DebugMaterial visualization modes</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>BangBang3d - A complete 3D engine where every pixel is earned on the CPU 🎨🔺</p>
+    <p style="margin-top: 0.5rem; color: #666;">MIT License | Built with JavaScript & determination</p>
+  </footer>
+
+  <!-- Scroll to Top Button -->
+  <div class="scroll-top" id="scrollTop" onclick="scrollToTop()">↑</div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabName) {
+      // Hide all content
+      document.querySelectorAll('.doc-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      
+      // Deactivate all tabs
+      document.querySelectorAll('.doc-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // Show selected content
+      document.getElementById(tabName).classList.add('active');
+      
+      // Activate selected tab
+      event.target.classList.add('active');
+    }
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+
+    // Scroll to top button
+    const scrollTopBtn = document.getElementById('scrollTop');
+    
+    window.addEventListener('scroll', () => {
+      if (window.pageYOffset > 300) {
+        scrollTopBtn.classList.add('visible');
+      } else {
+        scrollTopBtn.classList.remove('visible');
+      }
+    });
+
+    function scrollToTop() {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+    // Add parallax effect to hero
+    window.addEventListener('scroll', () => {
+      const scrolled = window.pageYOffset;
+      const hero = document.querySelector('.hero');
+      if (hero && scrolled < window.innerHeight) {
+        hero.style.transform = `translateY(${scrolled * 0.5}px)`;
+        hero.style.opacity = 1 - (scrolled / window.innerHeight);
+      }
+    });
+  </script>
+</body>
+</html>
+

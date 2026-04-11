@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BangBang3d - Glass & Transparency</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #0d1117;
+      color: #fff;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 12px 18px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 350px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 6px;
+      font-size: 13px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 150px;
+    }
+    
+    #canvas {
+      display: block;
+      margin: 0;
+    }
+    
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 20px;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+    
+    p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: #c9d1d9;
+    }
+    
+    .feature {
+      margin: 8px 0;
+      padding: 6px 10px;
+      background: rgba(88, 166, 255, 0.1);
+      border-radius: 4px;
+      font-size: 12px;
+      border-left: 3px solid #58a6ff;
+    }
+    
+    .highlight {
+      color: #79c0ff;
+      font-weight: 600;
+    }
+    
+    label {
+      display: block;
+      margin: 12px 0 4px;
+      font-size: 12px;
+      color: #c9d1d9;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      margin: 4px 0;
+    }
+    
+    .value {
+      display: inline-block;
+      margin-left: 8px;
+      color: #79c0ff;
+      font-weight: 600;
+    }
+    
+    /* Backend toggle buttons */
+    .backend-buttons {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .backend-btn {
+      padding: 6px 12px;
+      margin: 2px;
+      background: rgba(88, 166, 255, 0.2);
+      border: 1px solid rgba(88, 166, 255, 0.4);
+      border-radius: 4px;
+      color: #c9d1d9;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    
+    .backend-btn:hover {
+      background: rgba(88, 166, 255, 0.3);
+      border-color: rgba(88, 166, 255, 0.6);
+    }
+    
+    .backend-btn.active {
+      background: rgba(88, 166, 255, 0.5);
+      border-color: #58a6ff;
+      color: #fff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <h1>🔮 BangBang3d: Glass & Transparency</h1>
+    <p><span class="highlight">Alpha Blending!</span></p>
+    <p id="fps">FPS: --</p>
+    
+    <div class="feature">
+      ✓ Alpha blending (back-to-front)<br>
+      ✓ Transparent object sorting<br>
+      ✓ Depth write control<br>
+      ✓ Variable opacity
+    </div>
+    
+    <p style="margin-top: 10px; font-size: 11px; opacity: 0.7;">
+      Demonstrates transparent materials with proper depth sorting.
+    </p>
+  </div>
+  
+  <div id="controls">
+    <label>
+      Glass Opacity: <span class="value" id="opacityValue">0.30</span>
+    </label>
+    <input type="range" id="opacitySlider" min="0" max="100" value="30">
+    
+    <label style="margin-top: 16px;">
+      Depth Write:
+    </label>
+    <label style="margin-top: 4px;">
+      <input type="checkbox" id="depthWriteCheckbox">
+      <span style="font-size: 11px;">Write to depth buffer</span>
+    </label>
+    
+    <div class="backend-buttons">
+      <div style="font-size: 11px; margin-bottom: 6px; color: #8b949e;">Backend:</div>
+      <button class="backend-btn" id="cpuBtn">CPU</button>
+      <button class="backend-btn" id="gpuBtn">GPU</button>
+      <button class="backend-btn" id="autoBtn">Auto</button>
+      <div id="backendInfo" style="font-size: 10px; margin-top: 6px; color: #7ee787;">Backend: --</div>
+    </div>
+  </div>
+  
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import {
+      Scene,
+      Mesh,
+      BoxGeometry,
+      SphereGeometry,
+      PlaneGeometry,
+      BasicMaterial,
+      LambertMaterial,
+      PerspectiveCamera,
+      BangBangRenderer,
+      Vector3,
+      AmbientLight,
+      DirectionalLight
+    } from '../../src/index.js';
+
+    // Global renderer variable
+    let renderer = null;
+    
+    // Helper to get current canvas (it gets replaced on backend switch)
+    const getCanvas = () => document.getElementById('canvas');
+    
+    // Initialize renderer with specified backend
+    async function initRenderer(backendType) {
+      // Dispose old renderer if it exists
+      if (renderer) {
+        renderer.dispose();
+        renderer = null;
+      }
+      
+      console.log(`Initializing ${backendType} backend...`);
+      
+      // Important: Replace the canvas element to clear WebGPU context
+      const oldCanvas = document.getElementById('canvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      
+      // Get updated canvas reference
+      const canvas = document.getElementById('canvas');
+      
+      // Create renderer with specified backend
+      renderer = new BangBangRenderer({
+        canvas: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: 1,
+        backend: backendType
+      });
+      
+      // Wait for initialization (GPU is async)
+      await renderer.initialize();
+      
+      renderer.setClearColor(0x1a1a2e);
+      
+      console.log('Backend initialized:', renderer.backendType);
+      
+      // Update UI
+      document.getElementById('backendInfo').textContent = `Backend: ${renderer.backendType.toUpperCase()}`;
+      
+      // Update button states
+      document.querySelectorAll('.backend-btn').forEach(btn => btn.classList.remove('active'));
+      if (backendType === 'cpu') document.getElementById('cpuBtn').classList.add('active');
+      else if (backendType === 'gpu') document.getElementById('gpuBtn').classList.add('active');
+      else document.getElementById('autoBtn').classList.add('active');
+      
+      return renderer;
+    }
+
+    // Create scene
+    const scene = new Scene();
+
+    // Create camera
+    const camera = new PerspectiveCamera(
+      60,
+      window.innerWidth / window.innerHeight,
+      0.5,
+      100
+    );
+    camera.position.set(5, 4, 8);
+    camera.lookAt(new Vector3(0, 0, 0));
+
+    // Add lights
+    const ambient = new AmbientLight(0xffffff, 0.5);
+    scene.add(ambient);
+
+    const sun = new DirectionalLight(0xffffff, 0.7);
+    sun.position.set(5, 10, 7);
+    sun.target = new Vector3(0, 0, 0);
+    scene.add(sun);
+
+    // Create opaque background objects (colorful boxes)
+    const opaqueBoxes = [];
+    const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+    
+    for (let i = 0; i < 6; i++) {
+      const box = new Mesh(
+        new BoxGeometry(1, 1, 1),
+        new LambertMaterial({ color: colors[i] })
+      );
+      
+      const angle = (i / 6) * Math.PI * 2;
+      box.position.set(
+        Math.cos(angle) * 3,
+        Math.sin(i * 0.5) * 2,
+        Math.sin(angle) * 3
+      );
+      box.rotation.y = -angle;
+      
+      scene.add(box);
+      opaqueBoxes.push(box);
+    }
+
+    // Create ground plane
+    const ground = new Mesh(
+      new PlaneGeometry(20, 20),
+      new LambertMaterial({ color: 0x333333 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -2;
+    scene.add(ground);
+
+    // Create glass sphere in the center
+    const glassMaterial = new BasicMaterial({ color: 0x88ccff });
+    glassMaterial.transparent = true;
+    glassMaterial.opacity = 0.3;
+    glassMaterial.depthWrite = false; // Don't write to depth buffer for proper transparency
+
+    const glassSphere = new Mesh(
+      new SphereGeometry(1.5, 32, 24),
+      glassMaterial
+    );
+    glassSphere.position.set(0, 0, 0);
+    scene.add(glassSphere);
+
+    // Create inner transparent cube
+    const innerCubeMaterial = new BasicMaterial({ color: 0xff88ff });
+    innerCubeMaterial.transparent = true;
+    innerCubeMaterial.opacity = 0.4;
+    innerCubeMaterial.depthWrite = false;
+
+    const innerCube = new Mesh(
+      new BoxGeometry(1, 1, 1),
+      innerCubeMaterial
+    );
+    innerCube.position.set(0, 0, 0);
+    scene.add(innerCube);
+
+    // UI Controls
+    const opacitySlider = document.getElementById('opacitySlider');
+    const opacityValue = document.getElementById('opacityValue');
+    const depthWriteCheckbox = document.getElementById('depthWriteCheckbox');
+
+    opacitySlider.addEventListener('input', (e) => {
+      const opacity = parseInt(e.target.value) / 100;
+      glassMaterial.opacity = opacity;
+      opacityValue.textContent = opacity.toFixed(2);
+    });
+
+    depthWriteCheckbox.addEventListener('change', (e) => {
+      glassMaterial.depthWrite = e.target.checked;
+      innerCubeMaterial.depthWrite = e.target.checked;
+    });
+    
+    // Backend toggle buttons
+    document.getElementById('cpuBtn').addEventListener('click', async () => {
+      await initRenderer('cpu');
+    });
+    
+    document.getElementById('gpuBtn').addEventListener('click', async () => {
+      await initRenderer('gpu');
+    });
+    
+    document.getElementById('autoBtn').addEventListener('click', async () => {
+      await initRenderer('auto');
+    });
+
+    // Animation loop
+    let lastTime = performance.now();
+    let frames = 0;
+    let fps = 0;
+
+    function animate(currentTime) {
+      requestAnimationFrame(animate);
+
+      // Update FPS counter
+      frames++;
+      if (currentTime >= lastTime + 1000) {
+        fps = frames;
+        frames = 0;
+        lastTime = currentTime;
+        document.getElementById('fps').textContent = `FPS: ${fps}`;
+      }
+
+      // Rotate colorful boxes
+      opaqueBoxes.forEach((box, i) => {
+        box.rotation.y += 0.01;
+        box.rotation.x += 0.005;
+      });
+
+      // Rotate glass sphere
+      glassSphere.rotation.y += 0.005;
+
+      // Rotate inner cube (opposite direction)
+      innerCube.rotation.y -= 0.02;
+      innerCube.rotation.x += 0.01;
+
+      // Render scene
+      renderer.render(scene, camera);
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (renderer) {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      }
+    });
+
+    // Initialize with GPU backend by default
+    await initRenderer('gpu');
+    
+    // Start animation
+    animate(performance.now());
+
+    console.log('BangBang3d Glass & Transparency Example');
+    console.log('✓ Alpha blending enabled');
+    console.log('✓ Back-to-front transparency rendering');
+    console.log('✓ Depth write control');
+  </script>
+</body>
+</html>

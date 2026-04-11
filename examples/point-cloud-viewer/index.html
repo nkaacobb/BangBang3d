@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Point Cloud Viewer - BangBang3D</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117; color: #c9d1d9; overflow: hidden;
+    }
+    canvas { display: block; }
+    #ui {
+      position: absolute; top: 10px; left: 10px; width: 260px;
+      background: rgba(0,0,0,0.88); border: 1px solid rgba(88,166,255,0.3);
+      border-radius: 8px; padding: 14px; font-size: 13px;
+      backdrop-filter: blur(8px);
+    }
+    h2 { font-size: 15px; color: #58a6ff; margin-bottom: 10px; }
+    .row { margin: 6px 0; display: flex; align-items: center; gap: 6px; }
+    .row label { flex: 0 0 100px; font-size: 12px; }
+    .row input[type=range] { flex: 1; }
+    .row span { width: 36px; text-align: right; font-size: 11px; color: #8b949e; }
+    button {
+      background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.3);
+      color: #c9d1d9; padding: 6px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 12px; width: 100%; margin-top: 4px;
+    }
+    button:hover { background: rgba(88,166,255,0.25); }
+    select {
+      background: #1a1a2e; color: #c9d1d9; border: 1px solid #30363d;
+      border-radius: 3px; padding: 3px 6px; font-size: 12px;
+    }
+    #stats {
+      margin-top: 10px; font-size: 11px; color: #8b949e; line-height: 1.6;
+    }
+    #drop-zone {
+      border: 2px dashed rgba(88,166,255,0.3); border-radius: 6px;
+      padding: 12px; text-align: center; font-size: 11px; color: #8b949e;
+      margin-top: 8px; cursor: pointer;
+    }
+    #drop-zone.hover { border-color: #58a6ff; color: #58a6ff; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="ui">
+    <h2>Point Cloud Viewer</h2>
+
+    <button id="btnLoadSample">Load Sample (Torus Knot)</button>
+
+    <div id="drop-zone">
+      Drop .ply or .xyz file here<br>or click to browse
+      <input type="file" id="fileInput" accept=".ply,.xyz,.txt" style="display:none;">
+    </div>
+
+    <div class="row">
+      <label>Point Size</label>
+      <input type="range" id="pointSize" min="1" max="20" value="4" step="0.5">
+      <span id="pointSizeVal">4</span>
+    </div>
+    <div class="row">
+      <label>Size Mode</label>
+      <select id="sizeMode">
+        <option value="attenuated" selected>Attenuated</option>
+        <option value="fixed">Fixed</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Blend Mode</label>
+      <select id="blendMode">
+        <option value="none" selected>None</option>
+        <option value="alpha">Alpha</option>
+        <option value="additive">Additive</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Gamma Correct</label>
+      <input type="checkbox" id="gammaCorrect" checked>
+    </div>
+
+    <div id="stats">
+      Points: —<br>
+      Bounds: —<br>
+      FPS: —
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      Scene, PerspectiveCamera, BangBangRenderer, Color, Vector3,
+      AmbientLight, PointCloud, PLYLoader, XYZRGBLoader
+    } from '../../src/index.js';
+    import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
+
+    // ── Setup ───────────────────────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const scene = new Scene();
+    scene.background = new Color(0.06, 0.06, 0.10);
+
+    const camera = new PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 500);
+    camera.position.set(4, 3, 5);
+    camera.lookAt(new Vector3(0, 0, 0));
+
+    const renderer = new BangBangRenderer({ canvas, width: canvas.width, height: canvas.height, backend: 'webgl2' });
+    await renderer.initialize();
+
+    scene.add(new AmbientLight(0xffffff, 0.3));
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    let currentPC = null;
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+
+    // ── Load helpers ────────────────────────────────────────────────────
+
+    function attachPC(pc) {
+      if (currentPC) { scene.remove(currentPC); currentPC.dispose(); }
+      // Centre model
+      pc.computeBounds();
+      const mid = new Vector3().addVectors(pc.boundingBox.min, pc.boundingBox.max).multiplyScalar(0.5);
+      pc.position.set(-mid.x, -mid.y, -mid.z);
+      scene.add(pc);
+      currentPC = pc;
+      updateStats();
+      // Adjust camera
+      const size = new Vector3().subVectors(pc.boundingBox.max, pc.boundingBox.min);
+      const maxDim = Math.max(size.x, size.y, size.z) || 5;
+      camera.position.set(maxDim, maxDim * 0.7, maxDim);
+      camera.lookAt(new Vector3(0, 0, 0));
+      console.log('[PointCloudViewer] Loaded', pc.count, 'points');
+    }
+
+    async function loadSample() {
+      try {
+        const pc = await PLYLoader.load('assets/sample-torus.ply', { pointSize: 4, sizeMode: 'attenuated' });
+        attachPC(pc);
+      } catch (e) {
+        console.error('Failed to load sample:', e);
+        // Fallback: generate procedurally
+        const n = 2000;
+        const pos = new Float32Array(n * 3);
+        const col = new Uint8Array(n * 3);
+        for (let i = 0; i < n; i++) {
+          const t = (i / n) * Math.PI * 4;
+          const R = 2, r = 0.6, p = 2, q = 3;
+          const pr = Math.cos(q * t) * r + R;
+          pos[i*3]   = pr * Math.cos(p * t) + (Math.random()-0.5)*0.05;
+          pos[i*3+1] = pr * Math.sin(p * t) + (Math.random()-0.5)*0.05;
+          pos[i*3+2] = -Math.sin(q * t) * r + (Math.random()-0.5)*0.05;
+          const hue = (i / n) * 360;
+          const [rr,gg,bb] = hslToRgb(hue, 0.9, 0.6);
+          col[i*3] = rr; col[i*3+1] = gg; col[i*3+2] = bb;
+        }
+        const pc = new PointCloud({ pointSize: 4 });
+        pc.setData(pos, col);
+        attachPC(pc);
+      }
+    }
+
+    function hslToRgb(h, s, l) {
+      h /= 360;
+      let r, g, b;
+      if (s === 0) { r = g = b = l; } else {
+        const f = (p, q, t) => { if (t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p; };
+        const q2 = l < 0.5 ? l*(1+s) : l+s-l*s, p2 = 2*l - q2;
+        r = f(p2, q2, h+1/3); g = f(p2, q2, h); b = f(p2, q2, h-1/3);
+      }
+      return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+    }
+
+    function updateStats() {
+      if (!currentPC) return;
+      const b = currentPC.boundingBox;
+      document.getElementById('stats').innerHTML =
+        `Points: ${currentPC.count.toLocaleString()}<br>` +
+        `Bounds: (${b.min.x.toFixed(1)}, ${b.min.y.toFixed(1)}, ${b.min.z.toFixed(1)}) → ` +
+        `(${b.max.x.toFixed(1)}, ${b.max.y.toFixed(1)}, ${b.max.z.toFixed(1)})<br>` +
+        `FPS: ${fps}`;
+    }
+
+    // ── UI wiring ───────────────────────────────────────────────────────
+
+    document.getElementById('btnLoadSample').addEventListener('click', loadSample);
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('fileInput');
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('hover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+    dropZone.addEventListener('drop', async e => {
+      e.preventDefault(); dropZone.classList.remove('hover');
+      const file = e.dataTransfer.files[0];
+      if (file) await loadFile(file);
+    });
+    fileInput.addEventListener('change', async e => {
+      if (e.target.files[0]) await loadFile(e.target.files[0]);
+    });
+
+    async function loadFile(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext === 'ply') {
+        const buf = await file.arrayBuffer();
+        const pc = PLYLoader.parse(buf);
+        attachPC(pc);
+      } else {
+        const text = await file.text();
+        const pc = XYZRGBLoader.parse(text);
+        attachPC(pc);
+      }
+    }
+
+    document.getElementById('pointSize').addEventListener('input', e => {
+      document.getElementById('pointSizeVal').textContent = e.target.value;
+      if (currentPC) currentPC.pointSize = parseFloat(e.target.value);
+    });
+    document.getElementById('sizeMode').addEventListener('change', e => {
+      if (currentPC) currentPC.sizeMode = e.target.value;
+    });
+    document.getElementById('blendMode').addEventListener('change', e => {
+      if (currentPC) currentPC.blendMode = e.target.value;
+    });
+    document.getElementById('gammaCorrect').addEventListener('change', e => {
+      if (currentPC) currentPC.gammaCorrect = e.target.checked;
+    });
+
+    // ── Render loop ─────────────────────────────────────────────────────
+
+    function animate() {
+      controls.update();
+      renderer.render(scene, camera);
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime > 1000) {
+        fps = Math.round(frameCount * 1000 / (now - lastTime));
+        frameCount = 0;
+        lastTime = now;
+        updateStats();
+      }
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Auto-load sample on start
+    await loadSample();
+    animate();
+  </script>
+</body>
+</html>

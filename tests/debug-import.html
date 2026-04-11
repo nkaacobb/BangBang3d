@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Debug Import</title>
+</head>
+<body>
+  <h1>Debug Import Test</h1>
+  <canvas id="test-canvas" width="512" height="512"></canvas>
+  <div id="output"></div>
+  
+  <script type="module">
+    const output = document.getElementById('output');
+    
+    try {
+      console.log('Attempting to import ./test-helpers.js...');
+      const helpers = await import('./test-helpers.js');
+      console.log('SUCCESS! Imported:', Object.keys(helpers));
+      output.innerHTML = '<p style="color: green;">✓ Import successful! Exports: ' + Object.keys(helpers).join(', ') + '</p>';
+    } catch (err) {
+      console.error('FAILED to import test-helpers.js:', err);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
+      output.innerHTML = '<p style="color: red;">✗ Import failed!</p><pre>' + err.message + '\n\n' + err.stack + '</pre>';
+    }
+  </script>
+</body>
+</html>

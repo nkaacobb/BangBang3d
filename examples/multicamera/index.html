@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BangBang3d - Multi Camera Example</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; padding:0; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif; background:#0d1117; color:#c9d1d9; }
+    
+    #mainCanvas { display:block; position:absolute; top:0; left:0; width:100%; height:100%; }
+    
+    /* Right panel: camera inspector + controls */
+    #inspector { 
+      position:absolute; right:12px; top:12px; width:280px; max-height:calc(100vh - 24px);
+      padding:12px; background:rgba(13,17,23,0.95); border:1px solid rgba(88,166,255,0.3);
+      border-radius:6px; overflow-y:auto; font-size:13px;
+    }
+    #inspector h3 { margin:0 0 10px 0; font-size:15px; color:#58a6ff; border-bottom:1px solid rgba(88,166,255,0.2); padding-bottom:6px; }
+    #inspector h4 { margin:16px 0 6px 0; font-size:13px; color:#79c0ff; }
+    #inspector label { display:block; margin:8px 0 3px 0; color:#8b949e; font-size:11px; text-transform:uppercase; }
+    #inspector input[type="text"], #inspector input[type="number"] { 
+      width:100%; padding:6px 8px; background:#161b22; border:1px solid #30363d; 
+      border-radius:4px; color:#c9d1d9; font-size:12px;
+    }
+    #inspector input[type="range"] { width:100%; }
+    #inspector button { 
+      width:100%; margin:6px 0; padding:8px; background:#238636; border:none; 
+      border-radius:4px; color:#fff; cursor:pointer; font-size:12px; font-weight:600;
+    }
+    #inspector button:hover { background:#2ea043; }
+    #inspector button.secondary { background:#21262d; border:1px solid #30363d; }
+    #inspector button.secondary:hover { background:#30363d; }
+    #inspector button.danger { background:#da3633; }
+    #inspector button.danger:hover { background:#f85149; }
+    #inspector select { 
+      width:100%; padding:6px; background:#161b22; border:1px solid #30363d; 
+      border-radius:4px; color:#c9d1d9; font-size:12px;
+    }
+    .param-group { margin:10px 0; padding:10px; background:rgba(22,27,34,0.6); border-radius:4px; }
+    .inline-group { display:flex; gap:8px; align-items:center; }
+    .inline-group > * { flex:1; }
+    
+    /* Camera list */
+    #cameraList { margin:10px 0; }
+    .camera-item { 
+      display:flex; align-items:center; gap:8px; padding:8px; margin:4px 0;
+      background:#21262d; border:1px solid #30363d; border-radius:4px; cursor:pointer;
+    }
+    .camera-item.active { background:#1f6feb; border-color:#58a6ff; }
+    .camera-item:hover { border-color:#58a6ff; }
+    .camera-name { flex:1; font-size:12px; }
+    .camera-delete { 
+      padding:4px 8px; background:#da3633; border:none; border-radius:3px; 
+      color:#fff; cursor:pointer; font-size:10px;
+    }
+    
+    /* Bottom left: help and debug */
+    #helpBox { 
+      position:absolute; left:12px; bottom:12px; padding:10px 12px; 
+      background:rgba(13,17,23,0.9); border:1px solid rgba(88,166,255,0.3);
+      border-radius:6px; font-size:11px; max-width:300px;
+    }
+    #helpBox h4 { margin:0 0 6px 0; color:#58a6ff; font-size:12px; }
+    #helpBox ul { margin:4px 0 0 16px; padding:0; color:#8b949e; }
+    #helpBox li { margin:2px 0; }
+    
+    #debugInfo { 
+      position:absolute; left:12px; top:12px; padding:8px 12px;
+      background:rgba(13,17,23,0.9); border:1px solid rgba(88,166,255,0.3);
+      border-radius:6px; font-family:'Courier New',monospace; font-size:11px; color:#7ee787;
+    }
+    
+    /* Viewport labels */
+    .viewport-label {
+      position:absolute; padding:4px 8px; background:rgba(13,17,23,0.8);
+      border:1px solid rgba(88,166,255,0.3); border-radius:3px;
+      font-size:11px; color:#58a6ff; pointer-events:none;
+    }
+    .viewport-label.active { background:rgba(31,111,235,0.8); color:#fff; }
+    
+    /* FOV Schematic canvas */
+    #fovSchematic { 
+      width:100%; height:120px; background:#0d1117; 
+      border:1px solid #30363d; border-radius:4px; margin:8px 0;
+    }
+    
+    /* Viewport overlay for click handling */
+    .viewport-overlay {
+      position:absolute; border:2px solid transparent; pointer-events:all; cursor:pointer;
+    }
+    .viewport-overlay:hover { border-color:rgba(88,166,255,0.5); }
+    .viewport-overlay.active { border-color:#58a6ff; }
+    
+    /* Backend toggle buttons */
+    .backend-group { display:flex; gap:6px; margin:8px 0; }
+    .backend-group button { 
+      flex:1; padding:6px; background:#21262d; border:1px solid #30363d;
+      border-radius:4px; color:#c9d1d9; cursor:pointer; font-size:11px;
+    }
+    .backend-group button:hover { background:#30363d; }
+    .backend-group button.active { background:#238636; border-color:#2ea043; color:#fff; }
+  </style>
+</head>
+<body>
+  <canvas id="mainCanvas"></canvas>
+  
+  <div id="debugInfo"></div>
+  
+  <div id="inspector">
+    <h3>Camera Inspector</h3>
+    
+    <div class="param-group">
+      <h4>Backend</h4>
+      <div class="backend-group">
+        <button id="btnCPU">CPU</button>
+        <button id="btnGPU" class="active">GPU</button>
+        <button id="btnAuto">Auto</button>
+      </div>
+      <div id="backendInfo" style="font-size:11px; color:#7ee787; margin-top:4px;">Backend: --</div>
+    </div>
+    
+    <div class="param-group">
+      <h4>Viewport Mode</h4>
+      <select id="viewportMode">
+        <option value="single">Single View</option>
+        <option value="split2h">Split 2 Vertical</option>
+        <option value="split2v">Split 2 Horizontal</option>
+        <option value="split4">Split 4</option>
+      </select>
+      <div style="font-size:10px; color:#8b949e; margin-top:4px; line-height:1.3;">
+        Note: Multi-viewport rendering requires CPU backend
+      </div>
+    </div>
+    
+    <div class="param-group">
+      <h4>Camera List</h4>
+      <div id="cameraList"></div>
+      <button id="addCamera">+ Add Camera</button>
+      <button id="duplicateCamera" class="secondary">Duplicate Active</button>
+    </div>
+    
+    <div class="param-group">
+      <label>Camera Name</label>
+      <input type="text" id="cameraName" />
+      
+      <h4>Projection</h4>
+      <label>FOV (degrees)</label>
+      <input type="range" id="fovSlider" min="20" max="120" step="1" />
+      <input type="number" id="fovValue" min="20" max="120" step="1" />
+      
+      <label>Near Plane</label>
+      <input type="number" id="nearValue" min="0.1" max="10" step="0.1" />
+      
+      <label>Far Plane</label>
+      <input type="number" id="farValue" min="10" max="1000" step="10" />
+      
+      <canvas id="fovSchematic"></canvas>
+    </div>
+    
+    <div class="param-group">
+      <h4>Position</h4>
+      <div class="inline-group">
+        <div style="flex:0 0 20px; color:#8b949e;">X</div>
+        <input type="number" id="posX" step="0.1" />
+      </div>
+      <div class="inline-group">
+        <div style="flex:0 0 20px; color:#8b949e;">Y</div>
+        <input type="number" id="posY" step="0.1" />
+      </div>
+      <div class="inline-group">
+        <div style="flex:0 0 20px; color:#8b949e;">Z</div>
+        <input type="number" id="posZ" step="0.1" />
+      </div>
+    </div>
+    
+    <div class="param-group">
+      <h4>Target / Look At</h4>
+      <div class="inline-group">
+        <div style="flex:0 0 20px; color:#8b949e;">X</div>
+        <input type="number" id="targetX" step="0.1" />
+      </div>
+      <div class="inline-group">
+        <div style="flex:0 0 20px; color:#8b949e;">Y</div>
+        <input type="number" id="targetY" step="0.1" />
+      </div>
+      <div class="inline-group">
+        <div style="flex:0 0 20px; color:#8b949e;">Z</div>
+        <input type="number" id="targetZ" step="0.1" />
+      </div>
+    </div>
+    
+    <div class="param-group">
+      <h4>Control Mode</h4>
+      <select id="controlMode">
+        <option value="orbit">Orbit</option>
+        <option value="fly">Fly</option>
+      </select>
+      
+      <label>Movement Speed</label>
+      <input type="range" id="moveSpeed" min="0.1" max="5" step="0.1" value="1" />
+      
+      <label>Mouse Sensitivity</label>
+      <input type="range" id="mouseSensitivity" min="0.1" max="2" step="0.1" value="1" />
+    </div>
+    
+    <div class="param-group">
+      <button id="resetCamera" class="secondary">Reset Camera</button>
+      <button id="frameScene" class="secondary">Frame Scene</button>
+    </div>
+  </div>
+  
+  <div id="helpBox">
+    <h4>Controls</h4>
+    <ul id="helpList"></ul>
+  </div>
+  
+  <!-- Viewport overlays for click detection (created dynamically) -->
+  <div id="viewportOverlays"></div>
+
+  <script type="module">
+    import { Scene } from '../../src/core/Scene.js';
+    import { Mesh } from '../../src/core/Mesh.js';
+    import { BoxGeometry } from '../../src/geometry/BoxGeometry.js';
+    import { BasicMaterial } from '../../src/materials/BasicMaterial.js';
+    import { PerspectiveCamera } from '../../src/core/PerspectiveCamera.js';
+    import { BangBangRenderer } from '../../src/renderer/BangBangRenderer.js';
+    import { Vector3 } from '../../src/math/Vector3.js';
+    
+    // ========================================
+    // CAMERA RIG CLASS
+    // Manages camera state including control mode and target
+    // ========================================
+    class CameraRig {
+      constructor(name, camera, preset = 'default') {
+        this.name = name;
+        this.camera = camera;
+        this.preset = preset;  // Store original preset for reset
+        this.target = new Vector3(0, 0.5, 0);  // Default look-at target
+        this.controlMode = 'orbit';  // 'orbit' or 'fly'
+        
+        // Orbit state
+        this.orbitDistance = 5;
+        this.orbitYaw = 0;
+        this.orbitPitch = 0.5;
+        
+        // Fly state
+        this.flyYaw = 0;
+        this.flyPitch = 0;
+      }
+      
+      // Update camera position based on orbit parameters
+      updateOrbitPosition() {
+        const x = this.target.x + Math.cos(this.orbitYaw) * Math.cos(this.orbitPitch) * this.orbitDistance;
+        const y = this.target.y + Math.sin(this.orbitPitch) * this.orbitDistance;
+        const z = this.target.z + Math.sin(this.orbitYaw) * Math.cos(this.orbitPitch) * this.orbitDistance;
+        this.camera.position.set(x, y, z);
+        this.camera.lookAt(this.target.x, this.target.y, this.target.z);
+      }
+      
+      // Initialize orbit state from current camera position
+      syncOrbitFromCamera() {
+        const dx = this.camera.position.x - this.target.x;
+        const dy = this.camera.position.y - this.target.y;
+        const dz = this.camera.position.z - this.target.z;
+        this.orbitDistance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        this.orbitYaw = Math.atan2(dz, dx);
+        this.orbitPitch = Math.asin(dy / this.orbitDistance);
+      }
+      
+      // Get camera forward/right/up vectors for fly mode
+      getLocalAxes() {
+        const forward = new Vector3(
+          -Math.sin(this.flyYaw) * Math.cos(this.flyPitch),
+          Math.sin(this.flyPitch),
+          -Math.cos(this.flyYaw) * Math.cos(this.flyPitch)
+        );
+        const right = new Vector3(Math.cos(this.flyYaw), 0, -Math.sin(this.flyYaw));
+        const up = new Vector3(0, 1, 0);
+        return { forward, right, up };
+      }
+    }
+    
+    // ========================================
+    // VIEWPORT MANAGER
+    // Handles multi-viewport rendering and layout
+    // ========================================
+    class ViewportManager {
+      constructor(canvas, renderer, RendererClass) {
+        this.canvas = canvas;
+        this.renderer = renderer;
+        this.RendererClass = RendererClass;
+        this.mode = 'single';
+        this.viewports = [];
+        this.tempCanvas = document.createElement('canvas');
+        this.tempRenderer = null;
+        
+        // Create overlay canvas for UI elements (borders, labels)
+        // This works with both WebGPU and CPU backends
+        this.overlayCanvas = document.createElement('canvas');
+        this.overlayCanvas.style.position = 'absolute';
+        this.overlayCanvas.style.top = '0';
+        this.overlayCanvas.style.left = '0';
+        this.overlayCanvas.style.width = '100%';
+        this.overlayCanvas.style.height = '100%';
+        this.overlayCanvas.style.pointerEvents = 'none'; // Let clicks pass through
+        this.overlayCanvas.style.zIndex = '10'; // Above main canvas
+        this.overlayCanvas.width = canvas.width;
+        this.overlayCanvas.height = canvas.height;
+        
+        // Insert overlay after main canvas
+        canvas.parentNode.insertBefore(this.overlayCanvas, canvas.nextSibling);
+        
+        // Get 2D context from overlay (always works)
+        this.overlayCtx = this.overlayCanvas.getContext('2d');
+        
+        // Try to get 2D context from main canvas (only works for CPU backend)
+        this.mainCtx = canvas.getContext('2d');
+      }
+      
+      updateLayout(rigs, activeIndex) {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        this.viewports = [];
+        
+        if (this.mode === 'single') {
+          this.viewports.push({
+            x: 0, y: 0, width: w, height: h,
+            rigIndex: activeIndex
+          });
+        } else if (this.mode === 'split2h') {
+          const hw = Math.floor(w / 2);
+          this.viewports.push({
+            x: 0, y: 0, width: hw, height: h,
+            rigIndex: 0
+          });
+          this.viewports.push({
+            x: hw, y: 0, width: w - hw, height: h,
+            rigIndex: Math.min(1, rigs.length - 1)
+          });
+        } else if (this.mode === 'split2v') {
+          const hh = Math.floor(h / 2);
+          this.viewports.push({
+            x: 0, y: 0, width: w, height: hh,
+            rigIndex: 0
+          });
+          this.viewports.push({
+            x: 0, y: hh, width: w, height: h - hh,
+            rigIndex: Math.min(1, rigs.length - 1)
+          });
+        } else if (this.mode === 'split4') {
+          const hw = Math.floor(w / 2);
+          const hh = Math.floor(h / 2);
+          for (let i = 0; i < 4; i++) {
+            const rigIndex = i < rigs.length ? i : (i % rigs.length);
+            this.viewports.push({
+              x: (i % 2) * hw,
+              y: Math.floor(i / 2) * hh,
+              width: i % 2 === 0 ? hw : (w - hw),
+              height: Math.floor(i / 2) === 0 ? hh : (h - hh),
+              rigIndex
+            });
+          }
+        }
+      }
+      
+      async render(scene, rigs, activeIndex) {
+        // Sync overlay canvas size with main canvas
+        if (this.overlayCanvas.width !== this.canvas.width || this.overlayCanvas.height !== this.canvas.height) {
+          this.overlayCanvas.width = this.canvas.width;
+          this.overlayCanvas.height = this.canvas.height;
+        }
+        
+        // Clear overlay canvas (for borders/labels)
+        this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+        
+        // Single viewport mode: use main renderer directly
+        if (this.mode === 'single') {
+          const rig = rigs[activeIndex];
+          this.renderer.render(scene, rig.camera);
+          return; // No borders/labels needed in single view
+        }
+        
+        // Multi-viewport mode: CPU backend only (compositing)
+        if (!this.mainCtx) {
+          console.warn('[ViewportManager] Multi-viewport mode requires CPU backend');
+          return;
+        }
+        
+        // Clear main canvas
+        this.mainCtx.fillStyle = '#0d1117';
+        this.mainCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Create and initialize temp renderer if needed
+        if (!this.tempRenderer) {
+          this.tempRenderer = new this.RendererClass({ canvas: this.tempCanvas, backend: 'cpu' });
+          await this.tempRenderer.initialize();
+        }
+        
+        for (const vp of this.viewports) {
+          // Only resize temp canvas if dimensions changed
+          if (this.tempCanvas.width !== vp.width || this.tempCanvas.height !== vp.height) {
+            this.tempCanvas.width = vp.width;
+            this.tempCanvas.height = vp.height;
+            this.tempRenderer.setSize(vp.width, vp.height);
+          }
+          
+          // Get camera for this viewport
+          const rig = rigs[vp.rigIndex];
+          const cam = rig.camera;
+          
+          // Temporarily adjust camera aspect for this viewport
+          const oldAspect = cam.aspect;
+          cam.aspect = vp.width / vp.height;
+          cam.updateProjectionMatrix();
+          
+          // Render to temp canvas
+          this.tempRenderer.render(scene, cam);
+          
+          // Restore camera aspect
+          cam.aspect = oldAspect;
+          cam.updateProjectionMatrix();
+          
+          // Copy temp canvas to main canvas at viewport position
+          this.mainCtx.drawImage(this.tempCanvas, vp.x, vp.y);
+          
+          // Draw viewport border on overlay
+          this.overlayCtx.strokeStyle = vp.rigIndex === activeIndex ? '#58a6ff' : 'rgba(88,166,255,0.3)';
+          this.overlayCtx.lineWidth = 2;
+          this.overlayCtx.strokeRect(vp.x, vp.y, vp.width, vp.height);
+          
+          // Draw viewport label on overlay
+          this.overlayCtx.fillStyle = vp.rigIndex === activeIndex ? '#58a6ff' : 'rgba(88,166,255,0.7)';
+          this.overlayCtx.font = '11px monospace';
+          this.overlayCtx.fillText(rigs[vp.rigIndex].name, vp.x + 6, vp.y + 16);
+        }
+      }
+      
+      getViewportAt(x, y) {
+        return this.viewports.findIndex(vp => 
+          x >= vp.x && x < vp.x + vp.width &&
+          y >= vp.y && y < vp.y + vp.height
+        );
+      }
+      
+      dispose() {
+        // Remove overlay canvas from DOM
+        if (this.overlayCanvas && this.overlayCanvas.parentNode) {
+          this.overlayCanvas.parentNode.removeChild(this.overlayCanvas);
+        }
+        
+        // Dispose temp renderer
+        if (this.tempRenderer) {
+          this.tempRenderer.dispose();
+          this.tempRenderer = null;
+        }
+      }
+    }
+    
+    // ========================================
+    // CAMERA VISUALIZATION
+    // Renders frustums and camera icons in 3D
+    // ========================================
+    class CameraVizManager {
+      constructor(scene) {
+        this.scene = scene;
+        this.vizMeshes = [];
+      }
+      
+      update(rigs, activeIndex) {
+        // Clear old visualizations
+        this.vizMeshes.forEach(m => this.scene.remove(m));
+        this.vizMeshes = [];
+        
+        rigs.forEach((rig, idx) => {
+          if (idx === activeIndex) return;  // Don't visualize active camera
+          
+          // Camera body (small box at camera position)
+          const bodyGeo = new BoxGeometry(0.3, 0.3, 0.3);
+          const bodyMat = new BasicMaterial({ color: 0x58a6ff });
+          const body = new Mesh(bodyGeo, bodyMat);
+          body.position.copy(rig.camera.position);
+          this.scene.add(body);
+          this.vizMeshes.push(body);
+          
+          // Target indicator (small sphere/box at target point)
+          const targetGeo = new BoxGeometry(0.15, 0.15, 0.15);
+          const targetMat = new BasicMaterial({ color: 0xffaa00 });
+          const targetMarker = new Mesh(targetGeo, targetMat);
+          targetMarker.position.copy(rig.target);
+          this.scene.add(targetMarker);
+          this.vizMeshes.push(targetMarker);
+        });
+      }
+    }
+    
+    // ========================================
+    // FOV SCHEMATIC RENDERER
+    // Draws 2D representation of camera frustum
+    // ========================================
+    function drawFOVSchematic(canvas, fov, near, far) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Draw from side view: camera at left, frustum extending right
+      const camX = 30;
+      const camY = h / 2;
+      const scale = (w - 60) / far;
+      
+      const fovRad = fov * Math.PI / 180;
+      const nearDist = near * scale;
+      const farDist = far * scale;
+      const nearHeight = Math.tan(fovRad / 2) * near * scale * 2;
+      const farHeight = Math.tan(fovRad / 2) * far * scale * 2;
+      
+      // Draw frustum
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(camX, camY);
+      ctx.lineTo(camX + nearDist, camY - nearHeight / 2);
+      ctx.lineTo(camX + farDist, camY - farHeight / 2);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(camX, camY);
+      ctx.lineTo(camX + nearDist, camY + nearHeight / 2);
+      ctx.lineTo(camX + farDist, camY + farHeight / 2);
+      ctx.stroke();
+      
+      // Draw near/far planes
+      ctx.strokeStyle = '#7ee787';
+      ctx.beginPath();
+      ctx.moveTo(camX + nearDist, camY - nearHeight / 2);
+      ctx.lineTo(camX + nearDist, camY + nearHeight / 2);
+      ctx.stroke();
+      
+      ctx.strokeStyle = '#f85149';
+      ctx.beginPath();
+      ctx.moveTo(camX + farDist, camY - farHeight / 2);
+      ctx.lineTo(camX + farDist, camY + farHeight / 2);
+      ctx.stroke();
+      
+      // Labels
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '10px monospace';
+      ctx.fillText('Near: ' + near.toFixed(1), camX + nearDist - 20, camY - nearHeight / 2 - 5);
+      ctx.fillText('Far: ' + far.toFixed(0), camX + farDist - 20, camY - farHeight / 2 - 5);
+      ctx.fillText('FOV: ' + fov + '°', camX + 5, 15);
+    }
+    
+    // ========================================
+    // MAIN APPLICATION SETUP
+    // ========================================
+    
+    // Global variables
+    let renderer = null;
+    let viewportMgr = null;
+    let cameraVizMgr = null;
+    let currentBackend = 'gpu'; // Track current backend type
+    
+    // Initialize renderer with specified backend
+    async function initRenderer(backendType) {
+      // Dispose old renderer if it exists
+      if (renderer) {
+        renderer.dispose();
+        renderer = null;
+      }
+      
+      console.log(`Initializing ${backendType} backend...`);
+      
+      // Important: Replace the canvas element to clear WebGPU context
+      const oldCanvas = document.getElementById('mainCanvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'mainCanvas';
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      
+      // Get updated canvas reference
+      const canvas = document.getElementById('mainCanvas');
+      
+      // Create renderer with specified backend
+      renderer = new BangBangRenderer({ 
+        canvas,
+        backend: backendType
+      });
+      
+      // Wait for initialization (GPU is async)
+      await renderer.initialize();
+      console.log('Backend initialized:', renderer.backendType);
+      
+      // Update current backend tracker
+      currentBackend = renderer.backendType;
+      
+      // Update UI
+      document.getElementById('backendInfo').textContent = `Backend: ${renderer.backendType.toUpperCase()}`;
+      
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      
+      // Dispose old viewport manager if it exists
+      if (viewportMgr) {
+        viewportMgr.dispose();
+        viewportMgr = null;
+      }
+      
+      // Recreate viewport manager with new renderer and canvas
+      viewportMgr = new ViewportManager(canvas, renderer, BangBangRenderer);
+      
+      // Force viewport layout update
+      viewportMgr.updateLayout(rigs, activeRigIndex);
+      
+      return renderer;
+    }
+    
+    // Scene setup
+    const scene = new Scene();
+    scene.background = 0x0d1117;  // Match UI background
+    
+    // Cube
+    const cubeGeo = new BoxGeometry(2, 2, 2);
+    const cubeMat = new BasicMaterial({ color: 0x3fb950 });  // Green cube
+    const cube = new Mesh(cubeGeo, cubeMat);
+    cube.position.set(0, 1, 0);
+    scene.add(cube);
+    
+    // Floor
+    const floorGeo = new BoxGeometry(10, 0.1, 10);
+    const floorMat = new BasicMaterial({ color: 0x30363d });  // Dark gray floor
+    floorMat.side = 'DoubleSide';
+    const floor = new Mesh(floorGeo, floorMat);
+    floor.position.set(0, -0.4, 0);
+    scene.add(floor);
+    
+    // Camera rigs
+    const rigs = [];
+    let activeRigIndex = 0;
+    let activeViewportIndex = 0;  // Track which viewport is active
+    
+    function createCameraRig(name, preset = 'default') {
+      const cam = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 100);
+      const rig = new CameraRig(name, cam, preset);
+      
+      if (preset === 'default') {
+        cam.position.set(4, 3, 5);
+        rig.target.set(0, 0.5, 0);
+      } else if (preset === 'front') {
+        cam.position.set(0, 1.5, 6);
+        rig.target.set(0, 0.5, 0);
+      } else if (preset === 'top') {
+        cam.position.set(0, 8, 0.1);
+        rig.target.set(0, 0, 0);
+      } else if (preset === 'side') {
+        cam.position.set(6, 1.5, 0);
+        rig.target.set(0, 0.5, 0);
+      }
+      
+      cam.lookAt(rig.target.x, rig.target.y, rig.target.z);
+      rig.syncOrbitFromCamera();
+      return rig;
+    }
+    
+    // Initialize with preset cameras
+    rigs.push(createCameraRig('Main Camera', 'default'));
+    rigs.push(createCameraRig('Front View', 'front'));
+    rigs.push(createCameraRig('Top View', 'top'));
+    
+    // Create camera visualization manager (doesn't depend on renderer/canvas)
+    cameraVizMgr = new CameraVizManager(scene);
+    
+    // ========================================
+    // UI BINDINGS
+    // ========================================
+    
+    function updateCameraList() {
+      const list = document.getElementById('cameraList');
+      list.innerHTML = '';
+      rigs.forEach((rig, idx) => {
+        const item = document.createElement('div');
+        item.className = 'camera-item' + (idx === activeRigIndex ? ' active' : '');
+        
+        const name = document.createElement('span');
+        name.className = 'camera-name';
+        name.textContent = rig.name;
+        item.appendChild(name);
+        
+        if (rigs.length > 1) {
+          const delBtn = document.createElement('button');
+          delBtn.className = 'camera-delete';
+          delBtn.textContent = '×';
+          delBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (rigs.length > 1) {
+              rigs.splice(idx, 1);
+              activeRigIndex = Math.min(activeRigIndex, rigs.length - 1);
+              
+              // Update viewport assignments if needed
+              viewportMgr.viewports.forEach(vp => {
+                if (vp.rigIndex >= rigs.length) {
+                  vp.rigIndex = rigs.length - 1;
+                } else if (vp.rigIndex > idx) {
+                  vp.rigIndex--;
+                }
+              });
+              
+              updateCameraList();
+              updateInspector();
+            }
+          };
+          item.appendChild(delBtn);
+        }
+        
+        item.onclick = () => {
+          // Update active camera
+          activeRigIndex = idx;
+          // Assign this camera to the active viewport
+          if (viewportMgr.viewports.length > 0 && activeViewportIndex < viewportMgr.viewports.length) {
+            viewportMgr.viewports[activeViewportIndex].rigIndex = idx;
+          }
+          updateCameraList();
+          updateInspector();
+          updateHelpText();
+        };
+        
+        list.appendChild(item);
+      });
+    }
+    
+    function updateInspector() {
+      const rig = rigs[activeRigIndex];
+      const cam = rig.camera;
+      
+      document.getElementById('cameraName').value = rig.name;
+      document.getElementById('fovSlider').value = cam.fov;
+      document.getElementById('fovValue').value = cam.fov;
+      document.getElementById('nearValue').value = cam.near;
+      document.getElementById('farValue').value = cam.far;
+      
+      document.getElementById('posX').value = cam.position.x.toFixed(2);
+      document.getElementById('posY').value = cam.position.y.toFixed(2);
+      document.getElementById('posZ').value = cam.position.z.toFixed(2);
+      
+      document.getElementById('targetX').value = rig.target.x.toFixed(2);
+      document.getElementById('targetY').value = rig.target.y.toFixed(2);
+      document.getElementById('targetZ').value = rig.target.z.toFixed(2);
+      
+      document.getElementById('controlMode').value = rig.controlMode;
+      
+      const schematicCanvas = document.getElementById('fovSchematic');
+      drawFOVSchematic(schematicCanvas, cam.fov, cam.near, cam.far);
+    }
+    
+    function updateHelpText() {
+      const rig = rigs[activeRigIndex];
+      const list = document.getElementById('helpList');
+      list.innerHTML = '';
+      
+      if (rig.controlMode === 'orbit') {
+        list.innerHTML = `
+          <li>Drag: Orbit around target</li>
+          <li>Wheel: Zoom in/out</li>
+          <li>Shift+Drag: Pan target</li>
+        `;
+      } else {
+        list.innerHTML = `
+          <li>W/S: Forward/Back</li>
+          <li>A/D: Left/Right</li>
+          <li>Q/E: Down/Up</li>
+          <li>Drag: Look around</li>
+        `;
+      }
+    }
+    
+    // Event listeners
+    document.getElementById('cameraName').addEventListener('input', (e) => {
+      rigs[activeRigIndex].name = e.target.value;
+      updateCameraList();
+    });
+    
+    document.getElementById('fovSlider').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('fovValue').value = val;
+      rigs[activeRigIndex].camera.fov = val;
+      rigs[activeRigIndex].camera.updateProjectionMatrix();
+      updateInspector();
+    });
+    
+    document.getElementById('fovValue').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('fovSlider').value = val;
+      rigs[activeRigIndex].camera.fov = val;
+      rigs[activeRigIndex].camera.updateProjectionMatrix();
+      updateInspector();
+    });
+    
+    document.getElementById('nearValue').addEventListener('input', (e) => {
+      rigs[activeRigIndex].camera.near = parseFloat(e.target.value);
+      rigs[activeRigIndex].camera.updateProjectionMatrix();
+      updateInspector();
+    });
+    
+    document.getElementById('farValue').addEventListener('input', (e) => {
+      rigs[activeRigIndex].camera.far = parseFloat(e.target.value);
+      rigs[activeRigIndex].camera.updateProjectionMatrix();
+      updateInspector();
+    });
+    
+    ['posX', 'posY', 'posZ'].forEach((id, i) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        if (i === 0) rigs[activeRigIndex].camera.position.x = val;
+        if (i === 1) rigs[activeRigIndex].camera.position.y = val;
+        if (i === 2) rigs[activeRigIndex].camera.position.z = val;
+        rigs[activeRigIndex].syncOrbitFromCamera();
+      });
+    });
+    
+    ['targetX', 'targetY', 'targetZ'].forEach((id, i) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 0;
+        if (i === 0) rigs[activeRigIndex].target.x = val;
+        if (i === 1) rigs[activeRigIndex].target.y = val;
+        if (i === 2) rigs[activeRigIndex].target.z = val;
+        rigs[activeRigIndex].camera.lookAt(rigs[activeRigIndex].target.x, rigs[activeRigIndex].target.y, rigs[activeRigIndex].target.z);
+        rigs[activeRigIndex].syncOrbitFromCamera();
+      });
+    });
+    
+    document.getElementById('controlMode').addEventListener('change', (e) => {
+      rigs[activeRigIndex].controlMode = e.target.value;
+      updateHelpText();
+    });
+    
+    document.getElementById('viewportMode').addEventListener('change', async (e) => {
+      const newMode = e.target.value;
+      viewportMgr.mode = newMode;
+      viewportMgr.updateLayout(rigs, activeRigIndex);
+      
+      // Multi-viewport modes require CPU backend (WebGPU doesn't support viewport compositing)
+      if (newMode !== 'single' && currentBackend.includes('gpu')) {
+        console.log('[Multicamera] Switching to CPU backend for multi-viewport mode');
+        await initRenderer('cpu');
+      }
+    });
+    
+    document.getElementById('addCamera').addEventListener('click', () => {
+      const name = `Camera ${rigs.length}`;
+      const newRig = createCameraRig(name, 'default');
+      rigs.push(newRig);
+      activeRigIndex = rigs.length - 1;
+      updateCameraList();
+      updateInspector();
+    });
+    
+    document.getElementById('duplicateCamera').addEventListener('click', () => {
+      const source = rigs[activeRigIndex];
+      const name = source.name + ' Copy';
+      const cam = new PerspectiveCamera(source.camera.fov, source.camera.aspect, source.camera.near, source.camera.far);
+      cam.position.copy(source.camera.position);
+      const newRig = new CameraRig(name, cam);
+      newRig.target.copy(source.target);
+      newRig.controlMode = source.controlMode;
+      cam.lookAt(newRig.target.x, newRig.target.y, newRig.target.z);
+      newRig.syncOrbitFromCamera();
+      rigs.push(newRig);
+      activeRigIndex = rigs.length - 1;
+      updateCameraList();
+      updateInspector();
+    });
+    
+    document.getElementById('resetCamera').addEventListener('click', () => {
+      const rig = rigs[activeRigIndex];
+      
+      // Reset based on original preset
+      if (rig.preset === 'default') {
+        rig.camera.position.set(4, 3, 5);
+        rig.target.set(0, 0.5, 0);
+      } else if (rig.preset === 'front') {
+        rig.camera.position.set(0, 1.5, 6);
+        rig.target.set(0, 0.5, 0);
+      } else if (rig.preset === 'top') {
+        rig.camera.position.set(0, 8, 0.1);
+        rig.target.set(0, 0, 0);
+      } else if (rig.preset === 'side') {
+        rig.camera.position.set(6, 1.5, 0);
+        rig.target.set(0, 0.5, 0);
+      }
+      
+      rig.camera.fov = 60;
+      rig.camera.near = 0.5;
+      rig.camera.far = 100;
+      rig.camera.lookAt(rig.target.x, rig.target.y, rig.target.z);
+      rig.camera.updateProjectionMatrix();
+      rig.syncOrbitFromCamera();
+      updateInspector();
+    });
+    
+    document.getElementById('frameScene').addEventListener('click', () => {
+      const rig = rigs[activeRigIndex];
+      // Frame the scene: position camera to see cube and floor nicely
+      rig.camera.position.set(5, 4, 6);
+      rig.target.set(0, 0.5, 0);
+      rig.camera.lookAt(rig.target.x, rig.target.y, rig.target.z);
+      rig.syncOrbitFromCamera();
+      updateInspector();
+    });
+    
+    // ========================================
+    // INPUT HANDLING
+    // ========================================
+    
+    const keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+    
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+    let isOverUI = false;
+    
+    document.getElementById('inspector').addEventListener('mouseenter', () => isOverUI = true);
+    document.getElementById('inspector').addEventListener('mouseleave', () => isOverUI = false);
+    
+    // Helper to get current canvas (since it gets replaced on backend switch)
+    const getCanvas = () => document.getElementById('mainCanvas');
+    
+    document.body.addEventListener('pointerdown', (e) => {
+      const canvas = getCanvas();
+      if (!canvas || isOverUI) return;
+      
+      // Check if clicking a viewport to switch active viewport
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+      const vpIdx = viewportMgr.getViewportAt(x, y);
+      
+      if (vpIdx >= 0) {
+        // Set this as the active viewport
+        activeViewportIndex = vpIdx;
+        // Set active camera to the camera in this viewport
+        const vp = viewportMgr.viewports[vpIdx];
+        activeRigIndex = vp.rigIndex;
+        updateCameraList();
+        updateInspector();
+        updateHelpText();
+      }
+      
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      const canvasEl = getCanvas();
+      if (canvasEl) canvasEl.setPointerCapture(e.pointerId);
+    });
+    
+    document.body.addEventListener('pointerup', (e) => {
+      dragging = false;
+      const canvasEl = getCanvas();
+      if (canvasEl) canvasEl.releasePointerCapture(e.pointerId);
+    });
+    
+    document.body.addEventListener('pointermove', (e) => {
+      if (!dragging || isOverUI) return;
+      
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      
+      const rig = rigs[activeRigIndex];
+      const sensitivity = parseFloat(document.getElementById('mouseSensitivity').value);
+      
+      if (rig.controlMode === 'orbit') {
+        if (e.shiftKey) {
+          // Pan target
+          const panSpeed = 0.01 * sensitivity;
+          const { right, up } = rig.getLocalAxes();
+          rig.target.add(right.multiplyScalar(-dx * panSpeed));
+          rig.target.add(up.multiplyScalar(dy * panSpeed));
+        } else {
+          // Orbit
+          rig.orbitYaw -= dx * 0.005 * sensitivity;
+          rig.orbitPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rig.orbitPitch + dy * 0.005 * sensitivity));
+          rig.updateOrbitPosition();
+        }
+      } else {
+        // Fly mode: look around
+        rig.flyYaw -= dx * 0.003 * sensitivity;
+        rig.flyPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, rig.flyPitch - dy * 0.003 * sensitivity));
+        
+        const cam = rig.camera;
+        const dir = new Vector3(
+          -Math.sin(rig.flyYaw) * Math.cos(rig.flyPitch),
+          Math.sin(rig.flyPitch),
+          -Math.cos(rig.flyYaw) * Math.cos(rig.flyPitch)
+        );
+        rig.target.copy(cam.position).add(dir);
+        cam.lookAt(rig.target.x, rig.target.y, rig.target.z);
+      }
+      
+      updateInspector();
+    });
+    
+    document.body.addEventListener('wheel', (e) => {
+      const canvas = getCanvas();
+      if (!canvas || isOverUI) return;
+      
+      // Only prevent default if over canvas
+      const rect = canvas.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        e.preventDefault();
+      } else {
+        return; // Not over canvas, don't handle
+      }
+      
+      const rig = rigs[activeRigIndex];
+      if (rig.controlMode === 'orbit') {
+        const zoomSpeed = 0.1;
+        rig.orbitDistance = Math.max(0.5, rig.orbitDistance + (e.deltaY > 0 ? zoomSpeed : -zoomSpeed));
+        rig.updateOrbitPosition();
+        updateInspector();
+      }
+    }, { passive: false });
+    
+    // ========================================
+    // ANIMATION LOOP
+    // ========================================
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Handle fly mode keyboard input
+      const rig = rigs[activeRigIndex];
+      if (rig.controlMode === 'fly' && !isOverUI) {
+        const speed = parseFloat(document.getElementById('moveSpeed').value) * 0.1;
+        const { forward, right, up } = rig.getLocalAxes();
+        
+        if (keys['w']) rig.camera.position.add(forward.multiplyScalar(speed));
+        if (keys['s']) rig.camera.position.add(forward.multiplyScalar(-speed));
+        if (keys['a']) rig.camera.position.add(right.multiplyScalar(-speed));
+        if (keys['d']) rig.camera.position.add(right.multiplyScalar(speed));
+        if (keys['q']) rig.camera.position.add(up.multiplyScalar(-speed));
+        if (keys['e']) rig.camera.position.add(up.multiplyScalar(speed));
+        
+        rig.target.copy(rig.camera.position).add(rig.getLocalAxes().forward);
+        
+        if (keys['w'] || keys['s'] || keys['a'] || keys['d'] || keys['q'] || keys['e']) {
+          updateInspector();
+        }
+      }
+      
+      // Update camera visualization
+      cameraVizMgr.update(rigs, activeRigIndex);
+      
+      // Render (layout is only updated when mode changes)
+      viewportMgr.render(scene, rigs, activeRigIndex);
+      
+      // Update debug info
+      const info = renderer.getDebugInfo();
+      document.getElementById('debugInfo').textContent = 
+        `${rig.name} | Mode: ${rig.controlMode} | Pos: (${rig.camera.position.x.toFixed(1)}, ${rig.camera.position.y.toFixed(1)}, ${rig.camera.position.z.toFixed(1)}) | FOV: ${rig.camera.fov}°`;
+    }
+    
+    // ========================================
+    // INITIALIZATION
+    // ========================================
+    
+    // Backend selection buttons
+    document.getElementById('btnCPU').addEventListener('click', async () => {
+      document.querySelectorAll('.backend-group button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnCPU').classList.add('active');
+      await initRenderer('cpu');
+    });
+
+    document.getElementById('btnGPU').addEventListener('click', async () => {
+      document.querySelectorAll('.backend-group button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnGPU').classList.add('active');
+      await initRenderer('gpu');
+    });
+
+    document.getElementById('btnAuto').addEventListener('click', async () => {
+      document.querySelectorAll('.backend-group button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnAuto').classList.add('active');
+      await initRenderer('auto');
+    });
+    
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      rigs.forEach(rig => {
+        rig.camera.aspect = window.innerWidth / window.innerHeight;
+        rig.camera.updateProjectionMatrix();
+      });
+    });
+    
+    // Initialize with GPU backend by default
+    await initRenderer('gpu');
+    
+    updateCameraList();
+    updateInspector();
+    updateHelpText();
+    viewportMgr.updateLayout(rigs, activeRigIndex);
+    animate();
+    
+  </script>
+</body>
+</html>

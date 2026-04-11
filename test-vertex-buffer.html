@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebGPU Vertex Buffer Test</title>
+  <style>
+    body { margin: 0; padding: 20px; background: #222; }
+    canvas { border: 4px solid #0f0; display: block; }
+    #info { color: white; margin: 10px 0; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div id="info">Testing WebGPU with vertex buffers...</div>
+  <canvas id="canvas" width="800" height="600"></canvas>
+  
+  <script type="module">
+    const canvas = document.getElementById('canvas');
+    const info = document.getElementById('info');
+    
+    async function test() {
+      if (!navigator.gpu) {
+        info.textContent = 'WebGPU not supported!';
+        return;
+      }
+      
+      const adapter = await navigator.gpu.requestAdapter();
+      const device = await adapter.requestDevice();
+      const context = canvas.getContext('webgpu');
+      const format = navigator.gpu.getPreferredCanvasFormat();
+      
+      context.configure({
+        device: device,
+        format: format,
+        alphaMode: 'opaque'
+      });
+      
+      // Create vertex buffer - interleaved position and color
+      const vertexData = new Float32Array([
+        // x, y, z, r, g, b
+         0.0,  0.5, 0.0,  1.0, 0.0, 0.0,  // Top (red)
+        -0.5, -0.5, 0.0,  0.0, 1.0, 0.0,  // Bottom left (green)
+         0.5, -0.5, 0.0,  0.0, 0.0, 1.0   // Bottom right (blue)
+      ]);
+      
+      const vertexBuffer = device.createBuffer({
+        size: vertexData.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        mappedAtCreation: true
+      });
+      new Float32Array(vertexBuffer.getMappedRange()).set(vertexData);
+      vertexBuffer.unmap();
+      
+      info.textContent = `Vertex buffer created: ${vertexData.byteLength} bytes`;
+      
+      // Shader with vertex buffer input - NO uniforms
+      const shaderCode = `
+        struct VertexInput {
+          @location(0) position: vec3<f32>,
+          @location(1) color: vec3<f32>,
+        }
+        
+        struct VertexOutput {
+          @builtin(position) position: vec4<f32>,
+          @location(0) color: vec3<f32>,
+        }
+        
+        @vertex
+        fn vertexMain(input: VertexInput) -> VertexOutput {
+          var output: VertexOutput;
+          output.position = vec4<f32>(input.position, 1.0);
+          output.color = input.color;
+          return output;
+        }
+        
+        @fragment
+        fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
+          return vec4<f32>(input.color, 1.0);
+        }
+      `;
+      
+      const shaderModule = device.createShaderModule({ code: shaderCode });
+      
+      const pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module: shaderModule,
+          entryPoint: 'vertexMain',
+          buffers: [{
+            arrayStride: 24, // 6 floats * 4 bytes = 24
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: 'float32x3' },  // position
+              { shaderLocation: 1, offset: 12, format: 'float32x3' }  // color
+            ]
+          }]
+        },
+        fragment: {
+          module: shaderModule,
+          entryPoint: 'fragmentMain',
+          targets: [{ format: format }]
+        },
+        primitive: {
+          topology: 'triangle-list'
+        }
+      });
+      
+      // Render
+      const commandEncoder = device.createCommandEncoder();
+      const textureView = context.getCurrentTexture().createView();
+      
+      const passEncoder = commandEncoder.beginRenderPass({
+        colorAttachments: [{
+          view: textureView,
+          clearValue: { r: 0.2, g: 0.2, b: 0.3, a: 1.0 },
+          loadOp: 'clear',
+          storeOp: 'store'
+        }]
+      });
+      
+      passEncoder.setPipeline(pipeline);
+      passEncoder.setVertexBuffer(0, vertexBuffer);
+      passEncoder.draw(3);
+      passEncoder.end();
+      
+      device.queue.submit([commandEncoder.finish()]);
+      
+      info.textContent += ' - Rendered triangle with vertex buffer!';
+    }
+    
+    test();
+  </script>
+</body>
+</html>
