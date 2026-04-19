@@ -80,23 +80,37 @@ new BangBangRenderer(parameters = {})
 
 Accessed via `renderer.capabilities`. Properties vary by backend:
 
+Use `renderer.backendType` to determine the active backend. The capabilities object is feature-oriented and should not be treated as a backend identifier.
+
 **Common to all backends:**
 - `maxTextureSize` - Maximum texture dimension
+- `hasDepthTexture` - Whether a depth buffer/texture path is available
+- `hasMSAA` - Whether multisample anti-aliasing is supported
+- `maxColorAttachments` - Maximum simultaneous color attachments
+- `supportsFloatTextures` - Floating-point texture support
+- `supportsTextures` - Texture sampling support
+- `supportsLighting` - Built-in lighting support
+- `supportsShaders` - Shader-based material pipeline support
+- `supportsCompute` - General compute support
+- `supportsStorageBuffers` - Storage buffer support
+- `supportsShadows` - Shadow rendering support
+- `supportsPostProcessing` - Post-processing support
+- `supportsDeferredOrGBuffer` - Multiple render target / G-buffer style support
+- `supportsOIT` - Order-independent transparency support
+- `supportsPBR` - Physically based rendering support
+- `supportsInstancing` - Instanced rendering support
+- `supportsSkinningOnGPU` - GPU skinning support
 
 **CPU Backend:**
-- `backend: 'cpu'`
 - Limited feature set (basic rendering only)
 
 **GPU Backends (WebGPU/WebGL2):**
-- `backend: 'webgpu'` or `'webgl2'`
 - `supportsShaders: true`
-- `supportsGeometryCaching: true`
-- `supportsRenderGraph: true`
+- `supportsRenderTargets: true`
 - `supportsPostProcessing: true`
 - `supportsPBR: true` (PBR materials)
 - `supportsPointLights: true`
 - `supportsSpotLights: true`
-- `supportsHemisphereLights: true`
 - `supportsShadows: true` (shadow maps)
 - `supportsInstancing: true` (hardware instancing)
 - `supportsBatching: true` (mesh batching)
@@ -130,7 +144,7 @@ console.log('Compute shaders:', renderer.capabilities.supportsComputeShaders);
 
 // Use capabilities to enable features conditionally
 if (renderer.capabilities.supportsInstancing) {
-  // Use InstancedMesh for massive object counts
+  // InstancedMesh is implemented internally at ./src/core/InstancedMesh.js
   const instancedMesh = new InstancedMesh(geometry, material, 1000);
   scene.add(instancedMesh);
 }
@@ -1749,11 +1763,15 @@ new Light(color, intensity)
 - All Object3D properties
 - `color` - Light color (Color)
 - `intensity` - Light intensity (0-1+)
-- `enabled` - Enable/disable this light (default: `true`). When `false`, the renderer skips this light during shading, shadowing, and IBL passes across all material types (Basic, Lambert, PBR). This does **not** remove the light from the scene graph — it simply excludes it from lighting calculations.
+- `visible` - Cross-backend light enable/disable flag inherited from Object3D. Set this to `false` to disable the light in both CPU and GPU renderers.
+- `enabled` - Optional GPU-backend-only convention. The GPU renderer checks `light.enabled !== false`, but this flag is not defined on the base Light class and is ignored by the CPU renderer.
 
 ```javascript
-light.enabled = false;  // Light stays in scene but has no effect
-light.enabled = true;   // Re-enable the light
+light.visible = false;  // Cross-backend way to disable a light
+light.visible = true;   // Re-enable the light
+
+// Optional GPU-only toggle
+light.enabled = false;
 ```
 
 ---
@@ -1838,7 +1856,7 @@ Omnidirectional light emitting from a single point. Supports distance-based atte
 
 **Constructor:**
 ```javascript
-new PointLight(color = 0xffffff, intensity = 1.0, distance = 0, decay = 2)
+new PointLight(color = new Color(1, 1, 1), intensity = 1.0, distance = 0, decay = 2)
 ```
 
 **Parameters:**
@@ -1852,6 +1870,12 @@ new PointLight(color = 0xffffff, intensity = 1.0, distance = 0, decay = 2)
 - `distance` - Range at which intensity becomes zero (0 = infinite)
 - `decay` - Decay rate (1 = linear, 2 = inverse square)
 - `castShadow` - Whether light casts shadows (default: false)
+- `shadow` - Shadow configuration object:
+  - `mapSize` - Shadow map resolution: `{ x: 512, y: 512 }`
+  - `camera` - Shadow camera reference (default: `null`)
+  - `bias` - Depth bias (default: `0.0001`)
+  - `normalBias` - Normal-direction bias (default: `0.0`)
+  - `radius` - Filter radius (default: `1.0`)
 
 **Methods:**
 - `getAttenuation(distance)` - Calculate light attenuation at given distance
@@ -2363,6 +2387,8 @@ new DepthBuffer(width, height)
 
 ## Animation Classes
 
+These animation classes exist in the codebase but are not currently re-exported from `./src/index.js`. Import them from their module files directly.
+
 ### AnimationMixer
 
 Central manager for animations on a scene graph. Creates and updates `AnimationAction` instances that control individual clip playback.
@@ -2389,7 +2415,7 @@ new AnimationMixer(root)
 
 **Example:**
 ```javascript
-import { AnimationMixer } from './src/index.js';
+import { AnimationMixer } from './src/animation/AnimationMixer.js';
 
 // After loading a glTF with animations
 const mixer = new AnimationMixer(gltf.scene);
@@ -2910,7 +2936,8 @@ new GLTFLoader()
 
 **Example - Basic Loading:**
 ```javascript
-import { GLTFLoader } from './src/index.js';
+import { GLTFLoader } from './src/loaders/GLTFLoader.js';
+import { AnimationMixer } from './src/animation/AnimationMixer.js';
 
 const loader = new GLTFLoader();
 const gltf = await loader.load('models/character.glb');
