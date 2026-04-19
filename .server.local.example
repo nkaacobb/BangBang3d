@@ -1,0 +1,16 @@
+# BFPL Server Configuration
+# -------------------------------------------------------
+# Copy this file to .server.local and fill in your values.
+# .server.local is gitignored and will never be committed.
+# -------------------------------------------------------
+
+BFPL_SSH_USER=your-ssh-username
+BFPL_SSH_HOST=your-server-ip-or-hostname
+
+BFPL_APP_GROUP=projects
+BFPL_APP_SERVER_CATEGORY=your-server-category
+BFPL_APP_NAME=your-app-name
+BFPL_APP_REPO_PATH=/opt/apps/your-group/your-category/your-app-name/repo
+
+BFPL_APP_WEBSITE_CATEGORY=your-website-category
+BFPL_PUBLIC_URL=https://yourdomain.com/apps/your-website-category/your-app-name/
