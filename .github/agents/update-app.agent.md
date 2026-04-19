@@ -1,6 +1,6 @@
 ---
-name: Update-[AppDisplayName]
-description: 'Pulls latest [AppDisplayName] code to the server and verifies the app is still live'
+name: Update-BangBang3D
+description: 'Pulls latest BangBang3D code to the server and verifies the app is still live'
 tools: ['read', 'execute']
 model: 'Claude Sonnet 4.5'
 target: 'vscode'

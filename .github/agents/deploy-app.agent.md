@@ -1,6 +1,6 @@
 ---
-name: Deploy-[AppDisplayName]
-description: 'Commits and pushes [AppDisplayName] changes to GitHub during active development'
+name: Deploy-BangBang3D
+description: 'Commits and pushes BangBang3D changes to GitHub during active development'
 tools: ['read', 'edit', 'execute']
 model: 'Claude Sonnet 4.5'
 target: 'vscode'

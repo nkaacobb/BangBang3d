@@ -1,6 +1,6 @@
 ---
-name: Publish-[AppDisplayName]
-description: 'First-time publish of [AppDisplayName] to the BFPL server — clones repo, creates symlink, adds card entry to site'
+name: Publish-BangBang3D
+description: 'First-time publish of BangBang3D to the BFPL server — clones repo, creates symlink, adds card entry to site'
 tools: ['read', 'edit', 'execute']
 model: 'Claude Sonnet 4.5'
 target: 'vscode'
