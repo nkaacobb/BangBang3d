@@ -14,7 +14,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const WEBGPU_URL = 'http://localhost:8082/examples/rotating-cube/index.html';
+const WEBGPU_URL = '/examples/rotating-cube/index.html';
 const TIMEOUT = 10000;
 
 test.describe('WebGPU Rendering Pipeline', () => {

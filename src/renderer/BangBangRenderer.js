@@ -84,6 +84,15 @@ export class BangBangRenderer {
   }
 
   /**
+   * Backwards-compatible alias for initialize().
+   * Older tests and examples used waitForInitialization() before the lifecycle was simplified.
+   */
+  async waitForInitialization() {
+    await this.initialize();
+    return this;
+  }
+
+  /**
    * Initialize CPU backend
    * @private
    */
@@ -132,7 +141,7 @@ export class BangBangRenderer {
     console.log('[BangBangRenderer] Auto backend selection: trying GPU first...');
     
     try {
-      this._backend = new GPUBackend(parameters);
+      this._backend = new GPUBackend({ ...parameters, renderer: this });
       const success = await this._backend.initialize();
       
       if (success) {

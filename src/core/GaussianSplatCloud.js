@@ -45,14 +45,24 @@ export class GaussianSplatCloud extends Object3D {
     this.cutoff = options.cutoff ?? 3.0;
     /** 'premultiplied' | 'additive' */
     this.blendMode = options.blendMode ?? 'premultiplied';
+    /** Global scale multiplier for splat covariance */
+    this.scaleModifier = options.scaleModifier ?? 1.0;
+    /** Global opacity multiplier */
+    this.opacity = options.opacity ?? 1.0;
     /** Test against depth buffer */
     this.depthTest = options.depthTest ?? true;
     /** Write depth (usually false for translucent splats) */
     this.depthWrite = options.depthWrite ?? false;
+    /** Maximum projected splat radius in pixels to guard against runaway ellipses */
+    this.maxScreenRadius = options.maxScreenRadius ?? 128.0;
+    /** Minimum projected splat radius in pixels before LOD culling */
+    this.minScreenRadius = options.minScreenRadius ?? options.lodThreshold ?? 0.5;
+    /** Fragment alpha threshold */
+    this.minAlpha = options.minAlpha ?? 0.003;
     /** Resolution scale for off-screen rendering (1.0 = full, 0.5 = half) */
     this.resolutionScale = options.resolutionScale ?? 1.0;
     /** LOD screen-size threshold in pixels — skip splats smaller than this */
-    this.lodThreshold = options.lodThreshold ?? 0.5;
+    this.lodThreshold = this.minScreenRadius;
 
     // Bounding box
     this.boundingBox = { min: new Vector3(), max: new Vector3() };
@@ -108,20 +118,35 @@ export class GaussianSplatCloud extends Object3D {
    * Uses a single-pass radix-style bucket sort on quantised view-space depth
    * for large counts, falling back to Array.sort for small counts.
    * @param {import('../math/Matrix4.js').Matrix4} viewMatrix  camera worldInverse
+   * @param {import('../math/Matrix4.js').Matrix4|null} modelMatrix object world matrix
    */
-  sortByDepth(viewMatrix) {
+  sortByDepth(viewMatrix, modelMatrix = null) {
     const n = this.count;
     if (n === 0) return;
 
     const e = viewMatrix.elements;
+    const me = modelMatrix ? modelMatrix.elements : null;
     const pos = this.positions;
 
     // Compute view-space Z for each splat
     const depths = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const i3 = i * 3;
+      let x = pos[i3];
+      let y = pos[i3 + 1];
+      let z = pos[i3 + 2];
+
+      if (me) {
+        const worldX = me[0] * x + me[4] * y + me[8] * z + me[12];
+        const worldY = me[1] * x + me[5] * y + me[9] * z + me[13];
+        const worldZ = me[2] * x + me[6] * y + me[10] * z + me[14];
+        x = worldX;
+        y = worldY;
+        z = worldZ;
+      }
+
       // row 2 of viewMatrix dot position + translation
-      depths[i] = e[2] * pos[i3] + e[6] * pos[i3 + 1] + e[10] * pos[i3 + 2] + e[14];
+      depths[i] = e[2] * x + e[6] * y + e[10] * z + e[14];
     }
 
     const indices = this._sortedIndices;
@@ -159,6 +184,35 @@ export class GaussianSplatCloud extends Object3D {
       // Bucket sort naturally fills low-to-high Z = back-to-front
       for (let i = 0; i < n; i++) indices[i] = out[i];
     }
+  }
+
+  /**
+   * Build a coverage-preserving subset of already depth-sorted indices.
+   * When rendering fewer splats than exist in the source, taking the first
+   * N sorted splats only shows one depth slice of the object from the current
+   * view. Sampling evenly across the sorted order preserves the full shape
+   * while keeping the selected subset back-to-front.
+   * @param {Uint32Array} sortedIndices
+   * @param {number} availableCount
+   * @param {number} targetCount
+   * @returns {Uint32Array}
+   */
+  static selectRenderSubset(sortedIndices, availableCount, targetCount) {
+    const available = Math.max(0, Math.min(availableCount | 0, sortedIndices?.length ?? 0));
+    const target = Math.max(0, Math.min(targetCount | 0, available));
+
+    if (target === 0 || available === 0) return new Uint32Array(0);
+    if (target >= available) return sortedIndices.subarray(0, available);
+
+    const subset = new Uint32Array(target);
+    for (let index = 0; index < target; index++) {
+      const start = Math.floor(index * available / target);
+      const end = Math.max(start, Math.floor((index + 1) * available / target) - 1);
+      const sampleIndex = Math.floor((start + end) * 0.5);
+      subset[index] = sortedIndices[sampleIndex];
+    }
+
+    return subset;
   }
 
   dispose() {

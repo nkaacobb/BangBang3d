@@ -13,6 +13,7 @@ import { CubeTexture } from '../../resources/CubeTexture.js';
 import { SSRPass, SSR_DEFAULTS } from '../postprocessing/SSRPass.js';
 import { PointCloudShader } from '../shaders/PointCloudShader.js';
 import { GaussianSplatShader } from '../shaders/GaussianSplatShader.js';
+import { GaussianSplatCloud } from '../../core/GaussianSplatCloud.js';
 
 /**
  * GPUBackend - GPU-accelerated rendering backend
@@ -1799,10 +1800,10 @@ export class GPUBackend extends Backend {
     }
 
     // Render transparent meshes
-    gl.depthMask(false);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     for (const { mesh } of transparentMeshes) {
+      gl.depthMask(mesh.material?.depthWrite === true);
       const materialType = this._getMaterialType(mesh.material);
       const shader = this.shaders.get(materialType);
       
@@ -2234,8 +2235,17 @@ export class GPUBackend extends Backend {
     let envMaxLod = 0;
     let envIntensityMul = 1.0;
 
+    // Per-material envMap has highest priority.
+    if (!this._capturingProbe && material.envMap && material.envMap.isCubeTexture) {
+      const materialEnv = this._ensurePrefilteredCubeTexture(material.envMap, '__ibl_material_envmap_');
+      if (materialEnv) {
+        envTexKey = materialEnv.key;
+        envMaxLod = materialEnv.maxLod;
+      }
+    }
+
     // Skip probe lookup during probe capture to avoid recursion
-    if (!this._capturingProbe && scene.reflectionProbes && scene.reflectionProbes.length > 0 && mesh) {
+    if (!envTexKey && !this._capturingProbe && scene.reflectionProbes && scene.reflectionProbes.length > 0 && mesh) {
       const meshPos = {
         x: mesh.matrixWorld.elements[12],
         y: mesh.matrixWorld.elements[13],
@@ -2922,6 +2932,40 @@ export class GPUBackend extends Backend {
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometryBuffers.indexBuffer.buffer);
     gl.drawElements(gl.TRIANGLES, geometryBuffers.indexCount, geometryBuffers.indexType, 0);
+  }
+
+  /**
+   * Prefilter and upload a CubeTexture for PBR IBL sampling.
+   * @private
+   */
+  _ensurePrefilteredCubeTexture(env, keyPrefix = '__ibl_envmap_') {
+    if (!env || !env.isCubeTexture || !env.isComplete()) return null;
+
+    const envId = env.uuid || env.name || 'anonymous';
+    const version = env.version !== undefined ? env.version : 0;
+    const envKey = `${keyPrefix}${envId}_${version}`;
+
+    if (this.resourceManager.hasTexture(envKey)) {
+      const existing = this.resourceManager.getTexture(envKey);
+      return { key: envKey, maxLod: Math.max(0, (existing.mipLevels || 1) - 1) };
+    }
+
+    if (!this._pmremGenerator) {
+      this._pmremGenerator = new PMREMGenerator();
+    }
+
+    const prefiltered = this._pmremGenerator.fromCubeTexture(env, { mipLevels: 6 });
+    if (!prefiltered || !prefiltered._mips || prefiltered._mips.length === 0) {
+      console.warn('[GPUBackend] PMREM generation failed — cubemap IBL disabled');
+      return null;
+    }
+
+    const mips = prefiltered._mips;
+    const mipLevels = mips.length;
+    const baseSize = prefiltered.resolution || env.resolution || 256;
+
+    this.resourceManager.createCubeTexture(envKey, mips[0], baseSize, { mips });
+    return { key: envKey, maxLod: mipLevels - 1 };
   }
 
   /**
@@ -3638,28 +3682,37 @@ export class GPUBackend extends Backend {
 
       const n = Math.min(cloud.count, cloud.maxSplats > 0 ? cloud.maxSplats : cloud.count);
 
+      cloud.updateMatrixWorld(true);
+
       // Sort (CPU) — only when camera moved
       const camPos = camera.position;
       const dx = camPos.x - cloud._lastSortCamPos.x;
       const dy = camPos.y - cloud._lastSortCamPos.y;
       const dz = camPos.z - cloud._lastSortCamPos.z;
       if (dx * dx + dy * dy + dz * dz > cloud._sortThreshold * cloud._sortThreshold) {
-        cloud.sortByDepth(camera.matrixWorldInverse);
+        cloud.sortByDepth(camera.matrixWorldInverse, cloud.matrixWorld);
         cloud._lastSortCamPos.set(camPos.x, camPos.y, camPos.z);
       }
 
       // Upload sorted indices as R32F texture
+      const renderIndices = GaussianSplatCloud.selectRenderSubset(cloud._sortedIndices, cloud.count, n);
       const sortData = new Float32Array(bufs.idxW * bufs.idxH);
-      for (let i = 0; i < n; i++) sortData[i] = cloud._sortedIndices[i];
+      for (let i = 0; i < renderIndices.length; i++) sortData[i] = renderIndices[i];
       gl.bindTexture(gl.TEXTURE_2D, bufs.sortTex);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, bufs.idxW, bufs.idxH, gl.RED, gl.FLOAT, sortData);
 
       // Uniforms
       const u = shader.uniformLocations;
+      gl.uniformMatrix4fv(u.get('uModel'), false, cloud.matrixWorld.elements);
       gl.uniformMatrix4fv(u.get('uView'), false, camera.matrixWorldInverse.elements);
       gl.uniformMatrix4fv(u.get('uProjection'), false, camera.projectionMatrix.elements);
       gl.uniform2f(u.get('uViewport'), this.canvas.width, this.canvas.height);
       gl.uniform1f(u.get('uCutoff'), cloud.cutoff);
+      gl.uniform1f(u.get('uScaleModifier'), cloud.scaleModifier ?? 1.0);
+      gl.uniform1f(u.get('uOpacityScale'), cloud.opacity ?? 1.0);
+      gl.uniform1f(u.get('uMaxScreenRadius'), cloud.maxScreenRadius ?? 128.0);
+      gl.uniform1f(u.get('uMinScreenRadius'), cloud.minScreenRadius ?? cloud.lodThreshold ?? 0.5);
+      gl.uniform1f(u.get('uMinAlpha'), cloud.minAlpha ?? 0.003);
       gl.uniform1i(u.get('uDataWidth'), bufs.dataW);
       gl.uniform1i(u.get('uIndexWidth'), bufs.idxW);
 
@@ -3671,8 +3724,12 @@ export class GPUBackend extends Backend {
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, bufs.sortTex);  gl.uniform1i(u.get('uSortedIndices'), 4);
 
       // State: translucent, no depth write, premultiplied alpha
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthMask(cloud.depthWrite);
+      if (cloud.depthTest) {
+        gl.enable(gl.DEPTH_TEST);
+      } else {
+        gl.disable(gl.DEPTH_TEST);
+      }
+      gl.depthMask(!!cloud.depthWrite);
       gl.enable(gl.BLEND);
       if (cloud.blendMode === 'additive') {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE);

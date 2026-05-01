@@ -30,3 +30,6 @@ npm-debug.log*
 *.tmp
 .cache/
 .server.local
+# Large Gaussian splat / point cloud assets
+*.ply
+*.splat

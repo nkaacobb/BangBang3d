@@ -12,7 +12,7 @@
     }
     canvas { display: block; }
     #ui {
-      position: absolute; top: 10px; left: 10px; width: 270px;
+      position: absolute; top: 10px; left: 10px; width: 320px;
       background: rgba(0,0,0,0.88); border: 1px solid rgba(88,166,255,0.3);
       border-radius: 8px; padding: 14px; font-size: 13px;
       backdrop-filter: blur(8px); max-height: calc(100vh - 20px); overflow-y: auto;
@@ -23,6 +23,8 @@
     .row label { flex: 0 0 110px; font-size: 12px; }
     .row input[type=range] { flex: 1; }
     .row span { width: 40px; text-align: right; font-size: 11px; color: #8b949e; }
+    .button-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 5px; }
+    .button-row button { margin: 0; padding: 5px 6px; }
     select {
       background: #1a1a2e; color: #c9d1d9; border: 1px solid #30363d;
       border-radius: 3px; padding: 3px 6px; font-size: 12px;
@@ -45,6 +47,12 @@
     #stats {
       margin-top: 10px; font-size: 11px; color: #8b949e; line-height: 1.6;
     }
+    #status {
+      margin-top: 8px; padding: 7px 8px; border-radius: 4px;
+      background: rgba(88,166,255,0.08); color: #9ecbff; font-size: 11px;
+      border: 1px solid rgba(88,166,255,0.18);
+    }
+    #status.error { color: #ffb4a9; border-color: rgba(248,81,73,0.35); background: rgba(248,81,73,0.1); }
     #drop-zone {
       border: 2px dashed rgba(88,166,255,0.3); border-radius: 6px;
       padding: 10px; text-align: center; font-size: 11px; color: #8b949e;
@@ -62,27 +70,77 @@
 
     <div class="mode-toggle">
       <button id="btnPointCloud" class="active">Point Cloud</button>
+      <button id="btnSparse">Sparse Cloud</button>
       <button id="btnSplat">Gaussian Splats</button>
     </div>
 
     <button id="btnLoadSample">Load Sample Data</button>
+    <div class="row">
+      <label>Bundled Sample</label>
+      <select id="sampleAsset">
+        <option value="assets/sample-sphere.splat">Sample Sphere</option>
+        <option value="assets/bee.ply">Bee</option>
+        <option value="assets/Cthulhu.ply">Cthulhu</option>
+      </select>
+    </div>
+    <div id="status">Ready.</div>
 
     <div id="drop-zone">
       Drop .splat or .ply file here<br>or click to browse
-      <input type="file" id="fileInput" accept=".splat,.ply" style="display:none;">
+      <input type="file" id="fileInput" accept=".splat,.ply,.sog,.json,.webp,.png" multiple style="display:none;">
+    </div>
+
+    <div class="section" id="orientationControls">
+      <h3>Model Orientation</h3>
+      <div class="row">
+        <label>Up Axis</label>
+        <select id="upAxis">
+          <option value="native" selected>Native</option>
+          <option value="z-up">Z Up → Y Up</option>
+          <option value="z-down">Z Down → Y Up</option>
+          <option value="y-down">Y Down → Y Up</option>
+        </select>
+      </div>
+      <div class="button-row">
+        <button id="rotateX90">Pitch 90°</button>
+        <button id="rotateY90">Yaw 90°</button>
+        <button id="rotateZ90">Roll 90°</button>
+      </div>
+      <div class="button-row">
+        <button id="rotateXNeg90">Pitch -90°</button>
+        <button id="rotateYNeg90">Yaw -90°</button>
+        <button id="rotateZNeg90">Roll -90°</button>
+      </div>
+      <button id="flipModel">Flip 180°</button>
+      <button id="resetOrientation">Reset Orientation</button>
     </div>
 
     <div class="section" id="splatControls">
       <h3>Splat Controls</h3>
       <div class="row">
         <label>Cutoff</label>
-        <input type="range" id="cutoff" min="1" max="6" value="3" step="0.1">
-        <span id="cutoffVal">3.0</span>
+        <input type="range" id="cutoff" min="1" max="5" value="2.6" step="0.1">
+        <span id="cutoffVal">2.6</span>
+      </div>
+      <div class="row">
+        <label>Scale</label>
+        <input type="range" id="splatScale" min="0.1" max="3" value="1" step="0.05">
+        <span id="splatScaleVal">1.00</span>
+      </div>
+      <div class="row">
+        <label>Opacity</label>
+        <input type="range" id="splatOpacity" min="0.05" max="1.5" value="0.85" step="0.05">
+        <span id="splatOpacityVal">0.85</span>
+      </div>
+      <div class="row">
+        <label>Max Radius</label>
+        <input type="range" id="maxRadius" min="8" max="192" value="72" step="4">
+        <span id="maxRadiusVal">72</span>
       </div>
       <div class="row">
         <label>Max Splats</label>
-        <input type="range" id="maxSplats" min="100" max="100000" value="100000" step="100">
-        <span id="maxSplatsVal">100k</span>
+        <input type="range" id="maxSplats" min="100" max="5000000" value="1000000" step="100">
+        <span id="maxSplatsVal">1.0m</span>
       </div>
       <div class="row">
         <label>Blend Mode</label>
@@ -97,7 +155,7 @@
       </div>
       <div class="row">
         <label>Depth Write</label>
-        <input type="checkbox" id="depthWrite">
+        <input type="checkbox" id="depthWrite" disabled>
       </div>
     </div>
 
@@ -117,6 +175,42 @@
       </div>
     </div>
 
+    <div class="section" id="sparseControls" style="display:none;">
+      <h3>Sparse Sampling</h3>
+      <div class="row">
+        <label>Method</label>
+        <select id="sparseMode">
+          <option value="stride" selected>Stride</option>
+          <option value="voxel">Voxel Grid</option>
+          <option value="random">Seeded Random</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Max Points</label>
+        <input type="range" id="sparseMaxPoints" min="100" max="5000000" value="300000" step="100">
+        <span id="sparseMaxPointsVal">300k</span>
+      </div>
+      <div class="row">
+        <label>Ratio</label>
+        <input type="range" id="sampleRatio" min="0.01" max="1" value="1" step="0.01">
+        <span id="sampleRatioVal">100%</span>
+      </div>
+      <div class="row">
+        <label>Voxel Size</label>
+        <input type="range" id="voxelSize" min="0.01" max="0.5" value="0.08" step="0.01">
+        <span id="voxelSizeVal">0.08</span>
+      </div>
+    </div>
+
+    <div class="section" id="cameraControls">
+      <h3>Camera Controls</h3>
+      <div class="row">
+        <label>Zoom Speed</label>
+        <input type="range" id="zoomSpeed" min="0.05" max="0.5" value="0.15" step="0.01">
+        <span id="zoomSpeedVal">0.15</span>
+      </div>
+    </div>
+
     <div id="stats">
       Mode: —<br>
       Count: —<br>
@@ -128,8 +222,8 @@
   <script type="module">
     import {
       Scene, PerspectiveCamera, BangBangRenderer, Color, Vector3,
-      AmbientLight, PointCloud, GaussianSplatCloud,
-      PLYLoader, SplatLoader
+      AmbientLight, PointCloud, SparsePointCloud, GaussianSplatCloud,
+      PLYLoader, SplatLoader, SOGLoader
     } from '../../src/index.js';
     import { OrbitControls } from '../../src/extras/controls/OrbitControls.js';
 
@@ -153,9 +247,13 @@
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
+    controls.zoomSpeed = 0.15;
+    controls.minDistance = 0.02;
 
-    let currentObject = null;   // could be PointCloud or GaussianSplatCloud
-    let mode = 'pointcloud';    // 'pointcloud' | 'splat'
+    document.getElementById('depthWrite').checked = false;
+
+    let currentObject = null;   // PointCloud, SparsePointCloud, or GaussianSplatCloud
+    let mode = 'splat';         // 'pointcloud' | 'sparse' | 'splat'
 
     // Source data for mode switching
     let sourcePositions = null;
@@ -163,6 +261,21 @@
     let sourceScales = null;
     let sourceRotations = null;
     let sourceCount = 0;
+    let sourceLabel = 'None';
+    let orientation = { upAxis: 'native', x: 0, y: 0, z: 0 };
+
+    const MAX_PREVIEW_BUDGET = 300000;
+    const MAX_POINT_BUDGET = 5000000;
+    const DEFAULT_SPLAT_LOAD_BUDGET = 5000000;
+    const RECOMMENDED_SPLAT_SETTINGS = {
+      cutoff: 2.6,
+      scale: 1.0,
+      opacity: 0.95,
+      maxRadius: 96,
+      blendMode: 'premultiplied',
+      depthTest: true,
+      depthWrite: false
+    };
 
     let lastTime = performance.now();
     let frameCount = 0;
@@ -171,24 +284,32 @@
     // ── Mode toggle ─────────────────────────────────────────────────────
 
     const btnPC = document.getElementById('btnPointCloud');
+    const btnSparse = document.getElementById('btnSparse');
     const btnSplat = document.getElementById('btnSplat');
 
     btnPC.addEventListener('click', () => switchMode('pointcloud'));
+    btnSparse.addEventListener('click', () => switchMode('sparse'));
     btnSplat.addEventListener('click', () => switchMode('splat'));
 
     function switchMode(m) {
       mode = m;
       btnPC.classList.toggle('active', m === 'pointcloud');
+      btnSparse.classList.toggle('active', m === 'sparse');
       btnSplat.classList.toggle('active', m === 'splat');
-      document.getElementById('pcControls').style.display = m === 'pointcloud' ? '' : 'none';
+      document.getElementById('pcControls').style.display = (m === 'pointcloud' || m === 'sparse') ? '' : 'none';
+      document.getElementById('sparseControls').style.display = m === 'sparse' ? '' : 'none';
       document.getElementById('splatControls').style.display = m === 'splat' ? '' : 'none';
-      rebuildFromSource();
+      rebuildFromSource({ refitView: false });
     }
 
-    function rebuildFromSource() {
+    function rebuildFromSource(options = {}) {
       if (!sourcePositions) return;
 
+      const { refitView = true } = options;
+
       if (currentObject) { scene.remove(currentObject); currentObject.dispose(); currentObject = null; }
+
+      const oriented = buildOrientedSource();
 
       if (mode === 'pointcloud') {
         const pc = new PointCloud({
@@ -196,41 +317,218 @@
           sizeMode: document.getElementById('sizeMode').value
         });
         // Use RGB only (drop alpha if present)
-        let rgb = sourceColors;
-        if (sourceColors && sourceColors.length === sourceCount * 4) {
+        let rgb = oriented.colors;
+        if (oriented.colors && oriented.colors.length === sourceCount * 4) {
           rgb = new Uint8Array(sourceCount * 3);
           for (let i = 0; i < sourceCount; i++) {
-            rgb[i*3] = sourceColors[i*4];
-            rgb[i*3+1] = sourceColors[i*4+1];
-            rgb[i*3+2] = sourceColors[i*4+2];
+            rgb[i*3] = oriented.colors[i*4];
+            rgb[i*3+1] = oriented.colors[i*4+1];
+            rgb[i*3+2] = oriented.colors[i*4+2];
           }
         }
-        pc.setData(sourcePositions, rgb);
-        fitAndAdd(pc);
+        pc.setData(oriented.positions, rgb);
+        fitAndAdd(pc, { refitView });
+      } else if (mode === 'sparse') {
+        const sparse = new SparsePointCloud({
+          pointSize: parseFloat(document.getElementById('pointSize').value),
+          sizeMode: document.getElementById('sizeMode').value,
+          samplingMode: document.getElementById('sparseMode').value,
+          maxPoints: parseInt(document.getElementById('sparseMaxPoints').value),
+          sampleRatio: parseFloat(document.getElementById('sampleRatio').value),
+          voxelSize: parseFloat(document.getElementById('voxelSize').value)
+        });
+        sparse.setSparseData(oriented.positions, oriented.colors);
+        fitAndAdd(sparse, { refitView });
       } else {
         const sc = new GaussianSplatCloud({
           cutoff: parseFloat(document.getElementById('cutoff').value),
           maxSplats: parseInt(document.getElementById('maxSplats').value),
+          scaleModifier: parseFloat(document.getElementById('splatScale').value),
+          opacity: parseFloat(document.getElementById('splatOpacity').value),
+          maxScreenRadius: parseFloat(document.getElementById('maxRadius').value),
           blendMode: document.getElementById('blendModeSplat').value,
           depthTest: document.getElementById('depthTest').checked,
-          depthWrite: document.getElementById('depthWrite').checked
+          depthWrite: false
         });
         // Ensure RGBA colours
-        let rgba = sourceColors;
-        if (sourceColors && sourceColors.length === sourceCount * 3) {
+        let rgba = oriented.colors;
+        if (oriented.colors && oriented.colors.length === sourceCount * 3) {
           rgba = new Uint8Array(sourceCount * 4);
           for (let i = 0; i < sourceCount; i++) {
-            rgba[i*4] = sourceColors[i*3];
-            rgba[i*4+1] = sourceColors[i*3+1];
-            rgba[i*4+2] = sourceColors[i*3+2];
+            rgba[i*4] = oriented.colors[i*3];
+            rgba[i*4+1] = oriented.colors[i*3+1];
+            rgba[i*4+2] = oriented.colors[i*3+2];
             rgba[i*4+3] = 200;
           }
         }
-        const scales = sourceScales || defaultScales(sourceCount);
-        const rots = sourceRotations || defaultRotations(sourceCount);
-        sc.setData(sourcePositions, rgba, scales, rots);
-        fitAndAdd(sc);
+        const scales = oriented.scales || defaultScales(sourceCount);
+        const rots = oriented.rotations || defaultRotations(sourceCount);
+        sc.setData(oriented.positions, rgba, scales, rots);
+        fitAndAdd(sc, { refitView });
       }
+
+      updateStats();
+    }
+
+    function setSliderValue(id, value, formatter = v => `${v}`) {
+      const input = document.getElementById(id);
+      const min = input.min !== '' ? parseFloat(input.min) : value;
+      const max = input.max !== '' ? parseFloat(input.max) : value;
+      const clamped = Math.max(min, Math.min(max, Number(value)));
+      input.value = `${clamped}`;
+
+      const display = document.getElementById(`${id}Val`);
+      if (display) display.textContent = formatter(clamped);
+      return clamped;
+    }
+
+    function setSliderBounds(id, min, max, step) {
+      const input = document.getElementById(id);
+      input.min = `${min}`;
+      input.max = `${max}`;
+      input.step = `${step}`;
+    }
+
+    function setCheckboxValue(id, checked) {
+      document.getElementById(id).checked = checked;
+    }
+
+    function setSelectValue(id, value) {
+      document.getElementById(id).value = value;
+    }
+
+    function getRecommendedBudget() {
+      return sourceCount > 0 ? Math.min(sourceCount, MAX_PREVIEW_BUDGET) : MAX_PREVIEW_BUDGET;
+    }
+
+    function getDenseSplatBudget() {
+      return sourceCount > 0 ? Math.min(sourceCount, DEFAULT_SPLAT_LOAD_BUDGET) : DEFAULT_SPLAT_LOAD_BUDGET;
+    }
+
+    function updateBudgetSliderBounds() {
+      const budgetMax = Math.max(MAX_POINT_BUDGET, sourceCount || MAX_POINT_BUDGET);
+      const step = 100;
+      setSliderBounds('sparseMaxPoints', 100, budgetMax, step);
+      setSliderBounds('maxSplats', 100, budgetMax, step);
+    }
+
+    function applyRecommendedPreviewSettings(isGaussianSource = false) {
+      const recommendedBudget = getRecommendedBudget();
+
+      updateBudgetSliderBounds();
+
+      setSliderValue('sparseMaxPoints', recommendedBudget, formatCount);
+      setSliderValue('sampleRatio', 1, value => `${Math.round(parseFloat(value) * 100)}%`);
+
+      if (!isGaussianSource) return;
+
+      setSliderValue('maxSplats', getDenseSplatBudget(), formatCount);
+      setSliderValue('cutoff', RECOMMENDED_SPLAT_SETTINGS.cutoff, value => parseFloat(value).toFixed(1));
+      setSliderValue('splatScale', RECOMMENDED_SPLAT_SETTINGS.scale, value => parseFloat(value).toFixed(2));
+      setSliderValue('splatOpacity', RECOMMENDED_SPLAT_SETTINGS.opacity, value => parseFloat(value).toFixed(2));
+      setSliderValue('maxRadius', RECOMMENDED_SPLAT_SETTINGS.maxRadius, value => `${Math.round(value)}`);
+      setSelectValue('blendModeSplat', RECOMMENDED_SPLAT_SETTINGS.blendMode);
+      setCheckboxValue('depthTest', RECOMMENDED_SPLAT_SETTINGS.depthTest);
+      setCheckboxValue('depthWrite', false);
+    }
+
+    function buildOrientedSource() {
+      const positions = new Float32Array(sourcePositions.length);
+      const rotation = getOrientationAngles();
+      const cosX = Math.cos(rotation.x), sinX = Math.sin(rotation.x);
+      const cosY = Math.cos(rotation.y), sinY = Math.sin(rotation.y);
+      const cosZ = Math.cos(rotation.z), sinZ = Math.sin(rotation.z);
+      const orientationQuat = quaternionFromEuler(rotation.x, rotation.y, rotation.z);
+
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+      for (let i = 0; i < sourceCount; i++) {
+        const offset = i * 3;
+        let x = sourcePositions[offset];
+        let y = sourcePositions[offset + 1];
+        let z = sourcePositions[offset + 2];
+
+        let y1 = y * cosX - z * sinX;
+        let z1 = y * sinX + z * cosX;
+        y = y1; z = z1;
+
+        let x1 = x * cosY + z * sinY;
+        z1 = -x * sinY + z * cosY;
+        x = x1; z = z1;
+
+        x1 = x * cosZ - y * sinZ;
+        y1 = x * sinZ + y * cosZ;
+        x = x1; y = y1;
+
+        positions[offset] = x;
+        positions[offset + 1] = y;
+        positions[offset + 2] = z;
+
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+
+      const centerX = (minX + maxX) * 0.5;
+      const centerY = (minY + maxY) * 0.5;
+      const centerZ = (minZ + maxZ) * 0.5;
+      for (let i = 0; i < positions.length; i += 3) {
+        positions[i] -= centerX;
+        positions[i + 1] -= centerY;
+        positions[i + 2] -= centerZ;
+      }
+
+      return {
+        positions,
+        colors: sourceColors,
+        scales: sourceScales,
+        rotations: rotateSourceQuaternions(sourceRotations, orientationQuat)
+      };
+    }
+
+    function quaternionFromEuler(x, y, z) {
+      const c1 = Math.cos(x / 2), c2 = Math.cos(y / 2), c3 = Math.cos(z / 2);
+      const s1 = Math.sin(x / 2), s2 = Math.sin(y / 2), s3 = Math.sin(z / 2);
+      return [
+        c1 * c2 * c3 - s1 * s2 * s3,
+        s1 * c2 * c3 + c1 * s2 * s3,
+        c1 * s2 * c3 - s1 * c2 * s3,
+        c1 * c2 * s3 + s1 * s2 * c3
+      ];
+    }
+
+    function rotateSourceQuaternions(rotations, orientationQuat) {
+      if (!rotations) return null;
+      const result = new Float32Array(rotations.length);
+      const ow = orientationQuat[0], ox = orientationQuat[1], oy = orientationQuat[2], oz = orientationQuat[3];
+      for (let i = 0; i < sourceCount; i++) {
+        const offset = i * 4;
+        const sw = rotations[offset];
+        const sx = rotations[offset + 1];
+        const sy = rotations[offset + 2];
+        const sz = rotations[offset + 3];
+        result[offset] = ow * sw - ox * sx - oy * sy - oz * sz;
+        result[offset + 1] = ow * sx + ox * sw + oy * sz - oz * sy;
+        result[offset + 2] = ow * sy - ox * sz + oy * sw + oz * sx;
+        result[offset + 3] = ow * sz + ox * sy - oy * sx + oz * sw;
+      }
+      return result;
+    }
+
+    function getOrientationAngles() {
+      const preset = {
+        'native': [0, 0, 0],
+        'z-up': [-Math.PI / 2, 0, 0],
+        'z-down': [Math.PI / 2, 0, 0],
+        'y-down': [Math.PI, 0, 0]
+      }[orientation.upAxis] || [0, 0, 0];
+
+      return {
+        x: preset[0] + orientation.x,
+        y: preset[1] + orientation.y,
+        z: preset[2] + orientation.z
+      };
     }
 
     function defaultScales(n) {
@@ -244,17 +542,25 @@
       return r;
     }
 
-    function fitAndAdd(obj) {
+    function fitAndAdd(obj, options = {}) {
+      const { refitView = true } = options;
+
       obj.computeBounds();
-      const mid = new Vector3().addVectors(obj.boundingBox.min, obj.boundingBox.max).multiplyScalar(0.5);
-      obj.position.set(-mid.x, -mid.y, -mid.z);
+      obj.position.set(0, 0, 0);
       scene.add(obj);
       currentObject = obj;
 
-      const size = new Vector3().subVectors(obj.boundingBox.max, obj.boundingBox.min);
-      const maxDim = Math.max(size.x, size.y, size.z) || 5;
-      camera.position.set(maxDim, maxDim * 0.7, maxDim);
-      camera.lookAt(new Vector3(0, 0, 0));
+      if (refitView) {
+        const size = new Vector3().subVectors(obj.boundingBox.max, obj.boundingBox.min);
+        const maxDim = Math.max(size.x, size.y, size.z) || 5;
+        camera.position.set(maxDim, maxDim * 0.7, maxDim);
+        controls.target.set(0, 0, 0);
+        camera.lookAt(new Vector3(0, 0, 0));
+        controls._updateCameraPosition();
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
 
       updateStats();
       console.log(`[GaussianSplats] Loaded ${mode}:`, obj.count, 'elements');
@@ -262,43 +568,90 @@
 
     // ── File loading ────────────────────────────────────────────────────
 
+    function setStatus(message, isError = false) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.classList.toggle('error', isError);
+    }
+
+    function setSourceFromSplat(cloud, label) {
+      sourcePositions = cloud.positions;
+      sourceColors = cloud.colors;
+      sourceScales = cloud.scales;
+      sourceRotations = cloud.rotations;
+      sourceCount = cloud.count;
+      sourceLabel = label;
+      applyRecommendedPreviewSettings(true);
+    }
+
+    function setSourceFromPointCloud(cloud, label) {
+      sourcePositions = cloud.positions;
+      sourceColors = cloud.colors;
+      sourceScales = null;
+      sourceRotations = null;
+      sourceCount = cloud.count;
+      sourceLabel = label;
+      applyRecommendedPreviewSettings(false);
+    }
+
+    async function loadBundledAsset(assetPath) {
+      const name = assetPath.split('/').pop() || assetPath;
+      const ext = name.split('.').pop().toLowerCase();
+      const response = await fetch(assetPath);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${name}: ${response.status}`);
+      }
+
+      const buf = await response.arrayBuffer();
+      if (ext === 'splat') {
+        const sc = SplatLoader.parse(buf);
+        setSourceFromSplat(sc, name);
+        rebuildFromSource();
+        setStatus(`Loaded ${name} (${formatCount(sourceCount)} splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
+        return;
+      }
+
+      if (ext === 'sog') {
+        const sc = await SOGLoader.parse(buf);
+        setSourceFromSplat(sc, name);
+        rebuildFromSource();
+        setStatus(`Loaded ${name} (${formatCount(sourceCount)} SOG splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
+        return;
+      }
+
+      if (PLYLoader.hasGaussianSplatProperties(buf)) {
+        const sc = PLYLoader.parseGaussianSplats(buf);
+        setSourceFromSplat(sc, name);
+        rebuildFromSource();
+        setStatus(`Loaded ${name} (${formatCount(sourceCount)} Gaussian PLY splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
+        return;
+      }
+
+      const pc = PLYLoader.parse(buf);
+      setSourceFromPointCloud(pc, name);
+      rebuildFromSource();
+      setStatus(`Loaded ${name} (${formatCount(sourceCount)} points). Sparse preview budget set to ${formatCount(getRecommendedBudget())}.`);
+    }
+
     async function loadSample() {
+      const assetPath = document.getElementById('sampleAsset').value;
+      const name = assetPath.split('/').pop() || assetPath;
+      setStatus(`Loading bundled ${name}...`);
       try {
-        if (mode === 'splat') {
-          const sc = await SplatLoader.load('assets/sample-sphere.splat');
-          sourcePositions = sc.positions;
-          sourceColors = sc.colors;
-          sourceScales = sc.scales;
-          sourceRotations = sc.rotations;
-          sourceCount = sc.count;
-          fitAndAdd(sc);
-          currentObject = sc;
-        } else {
-          // Load PLY as point cloud for the sample view
-          const pc = await PLYLoader.load('assets/sample-sphere-pc.ply').catch(() => null);
-          if (pc) {
-            sourcePositions = pc.positions;
-            sourceColors = pc.colors;
-            sourceScales = null;
-            sourceRotations = null;
-            sourceCount = pc.count;
-            fitAndAdd(pc);
-            currentObject = pc;
-          } else {
-            // Generate Fibonacci sphere as point cloud fallback
-            generateFibSpherePC();
-          }
-        }
-      } catch (e) {
-        console.warn('Sample load failed, generating procedurally:', e);
-        generateFibSpherePC();
+        await loadBundledAsset(assetPath);
+      } catch (error) {
+        console.warn('Sample load failed, generating procedurally:', error);
+        generateProceduralSphereData();
+        setStatus('Sample asset unavailable; generated procedural splat data.', true);
       }
     }
 
-    function generateFibSpherePC() {
-      const n = 500;
+    function generateProceduralSphereData() {
+      const n = 900;
       const pos = new Float32Array(n * 3);
-      const col = new Uint8Array(n * 3);
+      const col = new Uint8Array(n * 4);
+      const scales = new Float32Array(n * 3);
+      const rotations = defaultRotations(n);
       const golden = (1 + Math.sqrt(5)) / 2;
       for (let i = 0; i < n; i++) {
         const theta = 2 * Math.PI * i / golden;
@@ -307,40 +660,67 @@
         pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
         pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
         pos[i*3+2] = r * Math.cos(phi);
-        col[i*3]   = Math.floor(((pos[i*3]/r)+1)*0.5*255);
-        col[i*3+1] = Math.floor(((pos[i*3+1]/r)+1)*0.5*255);
-        col[i*3+2] = Math.floor(((pos[i*3+2]/r)+1)*0.5*255);
+        col[i*4]   = Math.floor(((pos[i*3]/r)+1)*0.5*255);
+        col[i*4+1] = Math.floor(((pos[i*3+1]/r)+1)*0.5*255);
+        col[i*4+2] = Math.floor(((pos[i*3+2]/r)+1)*0.5*255);
+        col[i*4+3] = 210;
+
+        const scale = 0.06 + 0.035 * ((i % 17) / 16);
+        scales[i*3] = scale;
+        scales[i*3+1] = scale * 0.85;
+        scales[i*3+2] = scale * 1.15;
       }
       sourcePositions = pos;
       sourceColors = col;
-      sourceScales = null;
-      sourceRotations = null;
+      sourceScales = scales;
+      sourceRotations = rotations;
       sourceCount = n;
+      sourceLabel = 'procedural sphere';
       rebuildFromSource();
+    }
+
+    async function loadFiles(files) {
+      const fileList = Array.from(files);
+      if (fileList.length > 1 && fileList.some(file => file.name.toLowerCase() === 'meta.json')) {
+        setStatus('Loading SOG file set...');
+        const sc = await SOGLoader.parseFileSet(fileList);
+        setSourceFromSplat(sc, 'SOG file set');
+        switchMode('splat');
+        setStatus(`Loaded SOG file set (${formatCount(sourceCount)} splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
+        return;
+      }
+
+      if (fileList[0]) await loadFile(fileList[0]);
     }
 
     async function loadFile(file) {
       const ext = file.name.split('.').pop().toLowerCase();
+      setStatus(`Loading ${file.name}...`);
       if (ext === 'splat') {
         const buf = await file.arrayBuffer();
         const sc = SplatLoader.parse(buf);
-        sourcePositions = sc.positions;
-        sourceColors = sc.colors;
-        sourceScales = sc.scales;
-        sourceRotations = sc.rotations;
-        sourceCount = sc.count;
-        if (mode !== 'splat') switchMode('splat');
-        else { fitAndAdd(sc); currentObject = sc; }
+        setSourceFromSplat(sc, file.name);
+        rebuildFromSource();
+        setStatus(`Loaded ${file.name} (${formatCount(sourceCount)} splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
+      } else if (ext === 'sog') {
+        const buf = await file.arrayBuffer();
+        const sc = await SOGLoader.parse(buf);
+        setSourceFromSplat(sc, file.name);
+        rebuildFromSource();
+        setStatus(`Loaded ${file.name} (${formatCount(sourceCount)} SOG splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
       } else {
         const buf = await file.arrayBuffer();
-        const pc = PLYLoader.parse(buf);
-        sourcePositions = pc.positions;
-        sourceColors = pc.colors;
-        sourceScales = null;
-        sourceRotations = null;
-        sourceCount = pc.count;
-        if (mode !== 'pointcloud') switchMode('pointcloud');
-        else { fitAndAdd(pc); currentObject = pc; }
+        if (PLYLoader.hasGaussianSplatProperties(buf)) {
+          const sc = PLYLoader.parseGaussianSplats(buf);
+          setSourceFromSplat(sc, file.name);
+          rebuildFromSource();
+          setStatus(`Loaded ${file.name} (${formatCount(sourceCount)} Gaussian PLY splats). Initial splat budget set to ${formatCount(getDenseSplatBudget())}.`);
+        } else {
+          const pc = PLYLoader.parse(buf);
+          setSourceFromPointCloud(pc, file.name);
+          rebuildFromSource();
+          setStatus(`Loaded ${file.name} (${formatCount(sourceCount)} points). Sparse preview budget set to ${formatCount(getRecommendedBudget())}.`);
+        }
       }
     }
 
@@ -355,10 +735,31 @@
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
     dropZone.addEventListener('drop', async e => {
       e.preventDefault(); dropZone.classList.remove('hover');
-      if (e.dataTransfer.files[0]) await loadFile(e.dataTransfer.files[0]);
+      if (e.dataTransfer.files[0]) await loadFiles(e.dataTransfer.files);
     });
     fileInput.addEventListener('change', async e => {
-      if (e.target.files[0]) await loadFile(e.target.files[0]);
+      if (e.target.files[0]) await loadFiles(e.target.files);
+    });
+
+    document.getElementById('upAxis').addEventListener('change', e => {
+      orientation.upAxis = e.target.value;
+      rebuildFromSource({ refitView: false });
+    });
+    function rotateModel(axis, radians) {
+      orientation[axis] += radians;
+      rebuildFromSource({ refitView: false });
+    }
+    document.getElementById('rotateX90').addEventListener('click', () => rotateModel('x', Math.PI / 2));
+    document.getElementById('rotateY90').addEventListener('click', () => rotateModel('y', Math.PI / 2));
+    document.getElementById('rotateZ90').addEventListener('click', () => rotateModel('z', Math.PI / 2));
+    document.getElementById('rotateXNeg90').addEventListener('click', () => rotateModel('x', -Math.PI / 2));
+    document.getElementById('rotateYNeg90').addEventListener('click', () => rotateModel('y', -Math.PI / 2));
+    document.getElementById('rotateZNeg90').addEventListener('click', () => rotateModel('z', -Math.PI / 2));
+    document.getElementById('flipModel').addEventListener('click', () => rotateModel('x', Math.PI));
+    document.getElementById('resetOrientation').addEventListener('click', () => {
+      orientation = { upAxis: 'native', x: 0, y: 0, z: 0 };
+      document.getElementById('upAxis').value = 'native';
+      rebuildFromSource({ refitView: false });
     });
 
     // Splat controls
@@ -366,19 +767,44 @@
       document.getElementById('cutoffVal').textContent = parseFloat(e.target.value).toFixed(1);
       if (currentObject?.isGaussianSplatCloud) currentObject.cutoff = parseFloat(e.target.value);
     });
+    document.getElementById('splatScale').addEventListener('input', e => {
+      document.getElementById('splatScaleVal').textContent = parseFloat(e.target.value).toFixed(2);
+      if (currentObject?.isGaussianSplatCloud) currentObject.scaleModifier = parseFloat(e.target.value);
+    });
+    document.getElementById('splatOpacity').addEventListener('input', e => {
+      document.getElementById('splatOpacityVal').textContent = parseFloat(e.target.value).toFixed(2);
+      if (currentObject?.isGaussianSplatCloud) currentObject.opacity = parseFloat(e.target.value);
+    });
+    document.getElementById('maxRadius').addEventListener('input', e => {
+      document.getElementById('maxRadiusVal').textContent = e.target.value;
+      if (currentObject?.isGaussianSplatCloud) currentObject.maxScreenRadius = parseFloat(e.target.value);
+    });
     document.getElementById('maxSplats').addEventListener('input', e => {
       const v = parseInt(e.target.value);
-      document.getElementById('maxSplatsVal').textContent = v >= 1000 ? (v/1000).toFixed(0)+'k' : v;
+      document.getElementById('maxSplatsVal').textContent = formatCount(v);
       if (currentObject?.isGaussianSplatCloud) currentObject.maxSplats = v;
+      controls.update();
+      renderer.render(scene, camera);
+      updateStats();
     });
     document.getElementById('blendModeSplat').addEventListener('change', e => {
       if (currentObject?.isGaussianSplatCloud) currentObject.blendMode = e.target.value;
+      controls.update();
+      renderer.render(scene, camera);
+      updateStats();
     });
     document.getElementById('depthTest').addEventListener('change', e => {
       if (currentObject?.isGaussianSplatCloud) currentObject.depthTest = e.target.checked;
+      controls.update();
+      renderer.render(scene, camera);
+      updateStats();
     });
     document.getElementById('depthWrite').addEventListener('change', e => {
-      if (currentObject?.isGaussianSplatCloud) currentObject.depthWrite = e.target.checked;
+      e.target.checked = false;
+      if (currentObject?.isGaussianSplatCloud) currentObject.depthWrite = false;
+      controls.update();
+      renderer.render(scene, camera);
+      updateStats();
     });
 
     // Point cloud controls
@@ -390,15 +816,54 @@
       if (currentObject?.isPointCloud) currentObject.sizeMode = e.target.value;
     });
 
+    document.getElementById('sparseMode').addEventListener('change', () => {
+      if (mode === 'sparse') rebuildFromSource({ refitView: false });
+    });
+    document.getElementById('sparseMaxPoints').addEventListener('input', e => {
+      const value = parseInt(e.target.value);
+      document.getElementById('sparseMaxPointsVal').textContent = formatCount(value);
+      if (mode === 'sparse') rebuildFromSource({ refitView: false });
+    });
+    document.getElementById('sampleRatio').addEventListener('input', e => {
+      document.getElementById('sampleRatioVal').textContent = `${Math.round(parseFloat(e.target.value) * 100)}%`;
+      if (mode === 'sparse') rebuildFromSource({ refitView: false });
+    });
+    document.getElementById('voxelSize').addEventListener('input', e => {
+      document.getElementById('voxelSizeVal').textContent = parseFloat(e.target.value).toFixed(2);
+      if (mode === 'sparse') rebuildFromSource({ refitView: false });
+    });
+    document.getElementById('zoomSpeed').addEventListener('input', e => {
+      const value = parseFloat(e.target.value);
+      document.getElementById('zoomSpeedVal').textContent = value.toFixed(2);
+      controls.zoomSpeed = value;
+    });
+
     // ── Stats ───────────────────────────────────────────────────────────
+
+    function formatCount(value) {
+      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}m`;
+      if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+      return `${value}`;
+    }
 
     function updateStats() {
       if (!currentObject) return;
       const b = currentObject.boundingBox;
+      const modeLabel = mode === 'splat' ? 'Gaussian Splats' : mode === 'sparse' ? 'Sparse Point Cloud' : 'Point Cloud';
       const label = currentObject.isGaussianSplatCloud ? 'Splats' : 'Points';
+      const renderedCount = currentObject.isGaussianSplatCloud
+        ? Math.min(currentObject.count, currentObject.maxSplats > 0 ? currentObject.maxSplats : currentObject.count)
+        : currentObject.count;
+      const renderedLine = currentObject.isGaussianSplatCloud
+        ? `<br>Rendered: ${formatCount(renderedCount)} / ${formatCount(sourceCount)} (${currentObject.blendMode}, budget ${currentObject.maxSplats > 0 ? formatCount(currentObject.maxSplats) : 'full'})`
+        : `<br>Rendered: ${formatCount(renderedCount)} / ${formatCount(sourceCount)}`;
+      const sparseLine = currentObject.isSparsePointCloud
+        ? `<br>Sampling: ${currentObject.samplingMode}, ${formatCount(currentObject.count)} / ${formatCount(currentObject.sourceCount)}`
+        : '';
       document.getElementById('stats').innerHTML =
-        `Mode: ${mode === 'splat' ? 'Gaussian Splats' : 'Point Cloud'}<br>` +
-        `${label}: ${currentObject.count.toLocaleString()}<br>` +
+        `Mode: ${modeLabel}<br>` +
+        `Source: ${sourceLabel} (${formatCount(sourceCount)})<br>` +
+        `${label}: ${formatCount(currentObject.count)}${renderedLine}${sparseLine}<br>` +
         `Bounds: (${b.min.x.toFixed(1)}, ${b.min.y.toFixed(1)}, ${b.min.z.toFixed(1)}) → ` +
         `(${b.max.x.toFixed(1)}, ${b.max.y.toFixed(1)}, ${b.max.z.toFixed(1)})<br>` +
         `FPS: ${fps}`;

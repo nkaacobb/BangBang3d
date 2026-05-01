@@ -722,40 +722,111 @@
     let cameraCounter = 0;
     let ditherEnabled = false;    // Global dither toggle for the active camera
 
-    // Initialize renderer
-    async function initRenderer(backendType = 'gpu') {
-      console.log(`Initializing ${backendType} backend...`);
+    function rendererUsesWebGL2() {
+      return !!(renderer && renderer.backend && renderer.backend.gpuAPI === 'webgl2');
+    }
 
-      const canvas = document.getElementById('canvas');
+    function setupControls(domElement, controlsCamera = null, target = null) {
+      const activeCamera = controlsCamera || scene?.activeCamera || camera;
+      if (controls) {
+        controls.dispose();
+      }
+      controls = new OrbitControls(activeCamera, domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      if (target) {
+        controls.target.copy(target);
+      }
+      controls._updateCameraPosition();
+    }
 
-      renderer = new BangBangRenderer({
-        canvas: canvas,
+    function replaceRenderCanvas() {
+      const oldCanvas = document.getElementById('canvas');
+      const newCanvas = document.createElement('canvas');
+      newCanvas.id = 'canvas';
+      newCanvas.className = oldCanvas.className;
+      newCanvas.style.cssText = oldCanvas.style.cssText;
+      newCanvas.width = oldCanvas.width || window.innerWidth;
+      newCanvas.height = oldCanvas.height || window.innerHeight;
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+      return newCanvas;
+    }
+
+    async function createRendererForCanvas(backendType, canvas) {
+      const nextRenderer = new BangBangRenderer({
+        canvas,
         width: window.innerWidth,
         height: window.innerHeight,
         pixelRatio: 1,
         backend: backendType
       });
 
-      await renderer.initialize();
-      
-      if (!renderer.isReady()) {
-        console.error('Renderer failed to initialize');
-        return;
-      }
-      
-      renderer.setClearColor(0x1a1a2e);
-      
-      console.log('Backend initialized:', renderer.backendType);
-      
-      updateBackendIndicator();
+      await nextRenderer.initialize();
 
-      controls = new OrbitControls(camera, canvas);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
+      if (!nextRenderer.isReady()) {
+        console.error('Renderer failed to initialize');
+        return null;
+      }
+
+      nextRenderer.setClearColor(0x1a1a2e);
+      return nextRenderer;
+    }
+
+    // Initialize renderer
+    async function initRenderer(backendType = 'gpu') {
+      console.log(`Initializing ${backendType} backend...`);
+
+      const canvas = document.getElementById('canvas');
+      const nextRenderer = await createRendererForCanvas(backendType, canvas);
+      if (!nextRenderer) return;
+
+      renderer = nextRenderer;
+
+      console.log('Backend initialized:', renderer.backendType);
+
+      updateBackendIndicator();
+      setupControls(canvas);
 
       if (!animationId) {
         animate(performance.now());
       }
+    }
+
+    async function switchRendererBackend(backendType) {
+      const oldRenderer = renderer;
+      const shadowState = oldRenderer?.shadows ? { ...oldRenderer.shadows } : null;
+      const ssrWasActive = ssrActive;
+      const controlsCamera = controls?.camera || scene?.activeCamera || camera;
+      const controlsTarget = controls?.target ? controls.target.clone() : new Vector3();
+
+      renderer = null;
+
+      if (controls) {
+        controls.dispose();
+        controls = null;
+      }
+      if (oldRenderer) {
+        oldRenderer.dispose();
+      }
+
+      const canvas = replaceRenderCanvas();
+      const nextRenderer = await createRendererForCanvas(backendType, canvas);
+      if (!nextRenderer) return;
+
+      if (shadowState) {
+        Object.assign(nextRenderer.shadows, shadowState);
+      }
+
+      renderer = nextRenderer;
+      setupControls(canvas, controlsCamera, controlsTarget);
+      attachCanvasEventListeners();
+
+      if (ssrWasActive) {
+        renderer.enableSSR(true);
+      }
+
+      updateBackendIndicator();
+      updateSceneTree();
     }
 
     // Update backend indicator and show warnings
@@ -766,8 +837,8 @@
       if (renderer) {
         indicator.textContent = renderer.backendType.toUpperCase();
         
-        // Show warning if shadows enabled on non-WebGL2 backend
-        if (renderer.shadows && renderer.shadows.enabled && renderer.backendType !== 'webgl2') {
+        // Show warning if shadows are enabled on a backend without shadow maps
+        if (renderer.shadows && renderer.shadows.enabled && !rendererUsesWebGL2()) {
           warning.style.display = 'block';
         } else {
           warning.style.display = 'none';
@@ -1063,7 +1134,8 @@
       scene.setActiveCamera(cam);
       // Switch OrbitControls to the new camera
       if (controls) {
-        controls.object = cam;
+        controls.camera = cam;
+        controls._updateCameraPosition();
       }
       console.log(`Active camera set to: ${cam.userData.name || cam.type}`);
     }
@@ -1179,6 +1251,27 @@
       });
     }
 
+    function setReflectionProbeUI(active, statusText) {
+      const probeButton = document.getElementById('btnAddReflectionProbe');
+      probeButton.textContent = active ? 'Remove Probe' : 'Add Reflection Probe';
+      probeButton.style.background = active ? '#1e4620' : '';
+      probeButton.style.borderColor = active ? '#51cf66' : '';
+      document.getElementById('btnCaptureProbe').style.display = active ? 'block' : 'none';
+      document.getElementById('probe-status').textContent = statusText;
+      document.getElementById('probe-status').style.color = active ? '#51cf66' : '#8b949e';
+    }
+
+    function removeReflectionProbe(statusText = 'Probe removed') {
+      if (!reflectionProbe) return;
+      if (scene) {
+        scene.removeReflectionProbe(reflectionProbe);
+        scene.remove(reflectionProbe);
+      }
+      reflectionProbe.dispose();
+      reflectionProbe = null;
+      setReflectionProbeUI(false, statusText);
+    }
+
     function toggleDither() {
       ditherEnabled = !ditherEnabled;
       const btn = document.getElementById('btnToggleDither');
@@ -1226,6 +1319,10 @@
 
     // Clear all lights
     function clearLights() {
+      lightHelpers.forEach(helper => {
+        scene.remove(helper);
+        if (helper.dispose) helper.dispose();
+      });
       lights.forEach(light => {
         scene.remove(light);
         if (light.target && light.target.isObject3D) {
@@ -1250,6 +1347,7 @@
       });
       sceneObjects = [];
       selectedObject = null;
+      removeReflectionProbe('Probe removed by Clear All');
       updateSceneTree();
     }
 
@@ -2865,6 +2963,9 @@
       
       const helperIndex = lightHelpers.findIndex(h => h.light === selectedLight);
       if (helperIndex > -1) {
+        const helper = lightHelpers[helperIndex];
+        scene.remove(helper);
+        if (helper.dispose) helper.dispose();
         lightHelpers.splice(helperIndex, 1);
       }
       
@@ -3025,7 +3126,7 @@
         const enabling = !renderer.shadows.enabled;
         
         // If enabling shadows and not on WebGL2, auto-switch first
-        if (enabling && renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+        if (enabling && !rendererUsesWebGL2()) {
           console.log('Shadows require WebGL2 (Phase 1). Auto-switching backend...');
           await forceWebGL2Backend();
         }
@@ -3092,19 +3193,12 @@
       if (!renderer || !scene) return;
 
       // Ensure WebGL2 backend
-      if (renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+      if (!rendererUsesWebGL2()) {
         await forceWebGL2Backend();
       }
 
       if (reflectionProbe) {
-        // Already exists — remove it
-        scene.removeReflectionProbe(reflectionProbe);
-        scene.remove(reflectionProbe);
-        reflectionProbe.dispose();
-        reflectionProbe = null;
-        document.getElementById('btnAddReflectionProbe').textContent = 'Add Reflection Probe';
-        document.getElementById('btnCaptureProbe').style.display = 'none';
-        document.getElementById('probe-status').textContent = 'Probe removed';
+        removeReflectionProbe();
         return;
       }
 
@@ -3117,11 +3211,7 @@
       scene.add(reflectionProbe);
       scene.addReflectionProbe(reflectionProbe);
 
-      document.getElementById('btnAddReflectionProbe').textContent = 'Remove Probe';
-      document.getElementById('btnAddReflectionProbe').style.background = '#1e4620';
-      document.getElementById('btnAddReflectionProbe').style.borderColor = '#51cf66';
-      document.getElementById('btnCaptureProbe').style.display = 'block';
-      document.getElementById('probe-status').textContent = 'Probe added at (0, 2, 0) — click Capture!';
+      setReflectionProbeUI(true, 'Probe added at (0, 2, 0) — click Capture!');
     });
 
     document.getElementById('btnCaptureProbe').addEventListener('click', () => {
@@ -3140,7 +3230,7 @@
       if (!renderer) return;
 
       // Ensure WebGL2
-      if (renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+      if (!rendererUsesWebGL2()) {
         await forceWebGL2Backend();
       }
 
@@ -3200,7 +3290,7 @@
       if (!renderer || !scene) return;
 
       // Ensure WebGL2
-      if (renderer.backend && renderer.backend.gpuAPI !== 'webgl2') {
+      if (!rendererUsesWebGL2()) {
         await forceWebGL2Backend();
       }
 
@@ -3282,72 +3372,19 @@
       if (!renderer) return;
       
       // Check if already on WebGL2
-      if (renderer.backend && renderer.backend.gpuAPI === 'webgl2') {
+      if (rendererUsesWebGL2()) {
         console.log('Already on WebGL2 backend');
         return;
       }
-      
-      // Clear scene and dispose of grid overlay
-      clearAll();
-      
-      // Explicitly remove grid overlay from scene
-      if (gridOverlay && scene) {
-        gridOverlay.removeFromScene(scene);
-        gridOverlay = null;
-      }
-      
-      // Dispose old controls
-      if (controls) {
-        controls.dispose();
-        controls = null;
-      }
-      
-      // Temporarily set renderer to null to stop rendering during reinitialization
-      const oldRenderer = renderer;
-      renderer = null;
-      
-      // Dispose old renderer if it has a dispose method
-      if (oldRenderer.dispose) {
-        oldRenderer.dispose();
-      }
-      
-      // CRITICAL: Canvas context cannot be changed once created.
-      // We must create a new canvas element to switch from WebGPU to WebGL2
-      const oldCanvas = document.getElementById('canvas');
-      const newCanvas = document.createElement('canvas');
-      newCanvas.id = 'canvas';
-      
-      // Copy all attributes and styles
-      newCanvas.style.cssText = oldCanvas.style.cssText;
-      newCanvas.width = oldCanvas.width;
-      newCanvas.height = oldCanvas.height;
-      
-      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
-      
-      // Reinitialize with WebGL2 on the new canvas
-      await initRenderer('webgl2');
-      
-      // Recreate scene (this also recreates camera and adds default lights)
-      createScene();
-      
-      // IMPORTANT: Recreate controls with the new camera
-      if (controls) {
-        controls.dispose();
-      }
-      controls = new OrbitControls(camera, newCanvas);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      
-      // CRITICAL: Reattach mouse event listeners to the new canvas
-      attachCanvasEventListeners();
+
+      await switchRendererBackend('webgl2');
       
       updateBackendIndicator();
       updateSceneTree();
       
-      // Reset grid toggle button (new grid is always visible)
-      document.getElementById('btnToggleGrid').textContent = 'Hide Grid';
+      document.getElementById('btnToggleGrid').textContent = gridOverlay && gridOverlay.visible !== false ? 'Hide Grid' : 'Show Grid';
       
-      console.log('Forced WebGL2 backend with fresh canvas');
+      console.log('Forced WebGL2 backend without changing the scene');
     }
 
     document.getElementById('btnForceWebGL2').addEventListener('click', async () => {

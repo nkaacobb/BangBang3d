@@ -62,6 +62,7 @@ new BangBangRenderer(parameters = {})
 
 **Methods:**
 - `async initialize()` - Initialize the renderer backend (required for GPU backends)
+- `async waitForInitialization()` - Backwards-compatible alias for `initialize()`
 - `isReady()` - Check if renderer is ready to render
 - `async render(scene, camera)` - Render scene from camera
   - Automatically separates meshes into opaque and transparent groups
@@ -4400,6 +4401,7 @@ BangBang3D supports **Point Clouds** and **Gaussian Splats** (3D Gaussian Splatt
 | Feature | WebGL2 | WebGPU | CPU |
 |---------|--------|--------|-----|
 | Point Clouds | ✅ | — | — |
+| Sparse Point Clouds | ✅ | — | — |
 | Gaussian Splats | ✅ | — | — |
 
 ### PointCloud
@@ -4426,8 +4428,8 @@ scene.add(cloud);
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `pointSize` | `number` | `2` | Base point size in pixels |
-| `sizeMode` | `string` | `'fixed'` | `'fixed'` or `'attenuated'` (perspective-scaled) |
+| `pointSize` | `number` | `3` | Base point size in pixels |
+| `sizeMode` | `string` | `'attenuated'` | `'fixed'` or `'attenuated'` (perspective-scaled) |
 | `blendMode` | `string` | `'none'` | `'none'`, `'alpha'`, or `'additive'` |
 | `gammaCorrect` | `boolean` | `true` | Apply sRGB gamma correction |
 
@@ -4437,6 +4439,42 @@ scene.add(cloud);
 - `setData(positions, colors, sizes?)` — Set per-point data; auto-computes bounding box
 - `computeBounds()` — Recompute axis-aligned bounding box
 - `dispose()` — Free all data arrays
+
+### SparsePointCloud
+
+`src/core/SparsePointCloud.js` — A `PointCloud` subclass for deterministic sparse previews of dense point clouds or splat-derived data. It uses the same WebGL2 point renderer as `PointCloud`, but builds a sampled subset first.
+
+```javascript
+import { SparsePointCloud, SplatLoader } from 'bangbang3d';
+
+const splats = await SplatLoader.load('scene.splat');
+const sparse = new SparsePointCloud({
+  samplingMode: 'voxel',
+  maxPoints: 25000,
+  voxelSize: 0.04,
+  pointSize: 3,
+  sizeMode: 'attenuated'
+});
+
+sparse.setSparseData(splats.positions, splats.colors);
+scene.add(sparse);
+```
+
+**Constructor Options:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `samplingMode` | `string` | `'stride'` | `'stride'`, `'random'`, or `'voxel'` |
+| `maxPoints` | `number` | `50000` | Maximum sampled points; `0` means ratio-only |
+| `sampleRatio` | `number` | `1.0` | Fraction of source points to consider before `maxPoints` |
+| `voxelSize` | `number` | `0.05` | World-space voxel size for voxel sampling |
+| `seed` | `number` | `1337` | Seed for deterministic random sampling |
+
+**Methods:**
+- `setSparseData(positions, colors, options?)` — Build and assign a sparse point subset from dense source arrays
+- `SparsePointCloud.sample(positions, colors, options?)` — Static utility returning sampled `positions`, RGB `colors`, selected `indices`, and sampling metadata
+
+**Properties:** Inherits all `PointCloud` properties and adds `sourceCount`, `selectedIndices`, `samplingMode`, `maxPoints`, `sampleRatio`, `voxelSize`, and `seed`.
 
 ### GaussianSplatCloud
 
@@ -4456,13 +4494,18 @@ scene.add(splats);
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `maxSplats` | `number` | `Infinity` | Cap on rendered splats |
+| `maxSplats` | `number` | `0` | Cap on rendered splats; `0` means unlimited |
 | `cutoff` | `number` | `3.0` | Gaussian sigma cutoff (quad extent) |
 | `blendMode` | `string` | `'premultiplied'` | `'premultiplied'` or `'additive'` |
+| `scaleModifier` | `number` | `1.0` | Global multiplier for splat covariance scale |
+| `opacity` | `number` | `1.0` | Global alpha multiplier |
 | `depthTest` | `boolean` | `true` | Enable depth testing |
 | `depthWrite` | `boolean` | `false` | Write to depth buffer |
+| `maxScreenRadius` | `number` | `128` | Maximum projected ellipse radius in pixels |
+| `minScreenRadius` | `number` | `0.5` | Skip splats smaller than this projected radius |
+| `minAlpha` | `number` | `0.003` | Fragment alpha discard threshold |
 | `resolutionScale` | `number` | `1.0` | Internal resolution multiplier |
-| `lodThreshold` | `number` | `0` | Skip splats below this projected size |
+| `lodThreshold` | `number` | `0.5` | Alias for `minScreenRadius` |
 
 **Data Layout:**
 - `positions` — `Float32Array`, 3 floats per splat (x, y, z)
@@ -4472,11 +4515,12 @@ scene.add(splats);
 
 **Methods:**
 - `setData(positions, colors, scales, rotations)` — Set all per-splat data
-- `sortByDepth(viewMatrix)` — Back-to-front bucket sort for transparency; stores indices in `_sortedIndices`
+- `sortByDepth(viewMatrix, modelMatrix?)` — Back-to-front bucket sort for transparency; stores indices in `_sortedIndices`
+- `GaussianSplatCloud.selectRenderSubset(sortedIndices, availableCount, targetCount)` — Static helper that chooses a coverage-preserving subset from the sorted order when `maxSplats` is lower than `count`
 - `computeBounds()` — Recompute AABB from positions
 - `dispose()` — Free all data arrays
 
-**Sorting:** The engine automatically sorts splats back-to-front each frame using a 65 536-bucket radix sort (for counts > 65 536) or a standard comparison sort for smaller datasets. Re-sorting is skipped when the camera moves less than `_sortThreshold` (default 0.1 units).
+**Sorting:** The engine automatically sorts splats back-to-front each frame using a 65 536-bucket radix sort (for counts > 65 536) or a standard comparison sort for smaller datasets. Re-sorting is skipped when the camera moves less than `_sortThreshold` (default 0.1 units). If `maxSplats` is lower than `count`, rendering uses a coverage-preserving subset of the sorted order rather than taking only the nearest or furthest slice of the model.
 
 ### File Loaders
 
@@ -4484,7 +4528,7 @@ All loaders live in `src/loaders/PointCloudLoaders.js` and are re-exported from 
 
 #### PLYLoader
 
-Loads **Stanford PLY** files (ASCII or `binary_little_endian`). Returns a `PointCloud`.
+Loads **Stanford PLY** files (ASCII or `binary_little_endian`). Standard point-cloud PLY files return a `PointCloud`; 3D Gaussian Splatting PLY files can be decoded into a `GaussianSplatCloud`.
 
 ```javascript
 import { PLYLoader } from 'bangbang3d';
@@ -4494,9 +4538,26 @@ const cloud = await PLYLoader.load('assets/model.ply');
 
 // Synchronous from ArrayBuffer
 const cloud = PLYLoader.parse(arrayBuffer);
+
+// 3D Gaussian Splatting PLY from URL
+const splats = await PLYLoader.loadGaussianSplats('assets/scene.ply');
+
+// Auto-detect common 3DGS vertex fields before choosing a mode
+if (PLYLoader.hasGaussianSplatProperties(arrayBuffer)) {
+  const splats = PLYLoader.parseGaussianSplats(arrayBuffer);
+}
 ```
 
-**Supported properties:** `x`, `y`, `z`, `red`, `green`, `blue` (uchar or float), `intensity` (float, mapped to grey).
+**Point cloud properties:** `x`, `y`, `z`, `red`, `green`, `blue` (uchar or float), `f_dc_0`, `f_dc_1`, `f_dc_2` (SH DC colour fallback), and `intensity` (float, mapped to grey).
+
+**Gaussian splat properties:** `x`, `y`, `z`, `f_dc_0`, `f_dc_1`, `f_dc_2`, plus optional `opacity`, `scale_0`, `scale_1`, `scale_2`, `rot_0`, `rot_1`, `rot_2`, and `rot_3`.
+
+**Methods:**
+- `PLYLoader.load(url, options?)` — Fetch and parse as a `PointCloud` unless `options.as` requests splats
+- `PLYLoader.parse(data, options?)` — Parse string or `ArrayBuffer`; `options.as: 'splat'` returns `GaussianSplatCloud`
+- `PLYLoader.hasGaussianSplatProperties(data)` — Detect common 3DGS PLY fields
+- `PLYLoader.parseGaussianSplats(data, options?)` — Parse 3DGS PLY into `GaussianSplatCloud`
+- `PLYLoader.loadGaussianSplats(url, options?)` — Fetch and parse 3DGS PLY into `GaussianSplatCloud`
 
 #### SplatLoader
 
@@ -4515,6 +4576,27 @@ const splats = await SplatLoader.load('assets/scene.splat');
 | 12 | 12 | 3×float32 | Scale (sx, sy, sz) |
 | 24 | 4 | 4×uint8 | Colour (R, G, B, A) |
 | 28 | 4 | 4×uint8 | Quaternion (w, x, y, z) encoded as `q * 128 + 128` |
+
+#### SOGLoader
+
+Loads PlayCanvas Spatially Ordered Gaussian (`.sog`) bundles. Returns a `GaussianSplatCloud` using the same splat renderer as `.splat` and Gaussian PLY files.
+
+```javascript
+import { SOGLoader } from 'bangbang3d';
+
+// Bundled .sog ZIP from URL
+const splats = await SOGLoader.load('assets/scene.sog');
+
+// Browser file input containing meta.json and SOG property images
+const splatsFromFiles = await SOGLoader.parseFileSet(fileInput.files);
+```
+
+**Supported SOG layout:** version 2 `meta.json` plus `means`, `scales`, `quats`, and `sh0` property images. The current renderer consumes DC colour and opacity; higher-order SH textures are ignored.
+
+**Methods:**
+- `SOGLoader.load(url, options?)` — Fetch bundled `.sog` ZIP and return `GaussianSplatCloud`
+- `SOGLoader.parse(arrayBuffer, options?)` — Parse bundled `.sog` ZIP data
+- `SOGLoader.parseFileSet(files, options?)` — Parse an unpacked browser `FileList` containing `meta.json` and image assets
 
 #### XYZRGBLoader
 
@@ -4547,16 +4629,17 @@ Both types output non-reflective values to the SSR G-buffer (MRT locations 1 & 2
 - Per-splat data delivered via 4 × RGBA32F data textures (one texel per splat)
 - Sorted indices uploaded each frame as R32F texture
 - 3D covariance: $R \cdot S^2 \cdot R^T$ computed from per-splat rotation and scale
-- Projected to 2D via Jacobian: $J = \begin{bmatrix} f_x / z & 0 \\ 0 & f_y / z \end{bmatrix}$
-- 2D covariance: $\Sigma_{2D} = J \cdot \Sigma_{3D,\text{view}} \cdot J^T$ + low-pass filter (0.3)
+- Object transforms are applied through `cloud.matrixWorld`, so `position`, `rotation`, and `scale` work like other `Object3D` instances
+- Projected to pixel-space 2D covariance via the perspective Jacobian at the splat center
+- 2D covariance: $\Sigma_{2D} = J \cdot \Sigma_{3D,\text{view}} \cdot J^T$ + pixel-space low-pass filter (0.3)
 - Eigendecomposition of symmetric 2×2 for ellipse axes
-- Fragment: $\alpha = \exp(-0.5 \cdot d^2)$ with discard at 0.004
+- Fragment: $\alpha = \exp(-0.5 \cdot d^2)$ with discard below `minAlpha` (default `0.003`)
 
 ### Performance Notes
 
 - **Sorting cost:** Bucket sort with 65 536 bins runs in O(n) time. For 1M splats, expect ~5–8 ms per sort on desktop. Only re-sorts when camera moves beyond threshold.
 - **Data textures:** Splat data is packed into square RGBA32F textures of width $\lceil\sqrt{n}\rceil$. WebGL2 limits texture dimensions to at least 4096 (16M splats max).
-- **Max splats:** Set `maxSplats` to limit per-frame draw count. The engine draws `min(count, maxSplats)` splats.
+- **Max splats:** Set `maxSplats` to limit per-frame draw count. When the limit is below `count`, the renderer draws a coverage-preserving subset across the full sorted order instead of a single depth slice.
 - **GPU memory:** Each splat uses ~80 bytes of GPU texture memory (4 × RGBA32F texels + sorted index).
 - **Point clouds** are simpler: two vertex buffers (position + colour) with no sorting overhead.
 - **Instanced drawing:** Splats use `drawElementsInstanced` — a single quad (4 vertices, 6 indices) instanced N times.
@@ -4564,7 +4647,7 @@ Both types output non-reflective values to the SSR G-buffer (MRT locations 1 & 2
 ### Examples
 
 - **`examples/point-cloud-viewer/`** — Load PLY or XYZRGB files, adjust point size, size mode, blend mode, and gamma. Ships with a 2 000-point torus knot sample.
-- **`examples/gaussian-splats/`** — Load `.splat` files, toggle between point cloud and Gaussian splat rendering modes, adjust cutoff, max splats, blend mode, and depth settings. Ships with a 500-splat Fibonacci sphere sample.
+- **`examples/gaussian-splats/`** — Load bundled `.splat`, Gaussian PLY, or `.sog` assets, switch between point cloud, sparse point cloud, and Gaussian splat views, adjust orientation, point budgets, cutoff/scale/opacity/radius, and tune zoom speed for dense captures. Ships with bundled `sample-sphere.splat`, `bee.ply`, and `Cthulhu.ply` samples.
 
 ---
 

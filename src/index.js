@@ -87,8 +87,9 @@ export { default as PostProcessComposer } from './renderer/postprocessing/PostPr
 
 // Point Clouds & Gaussian Splats
 export { PointCloud } from './core/PointCloud.js';
+export { SparsePointCloud } from './core/SparsePointCloud.js';
 export { GaussianSplatCloud } from './core/GaussianSplatCloud.js';
-export { PLYLoader, SplatLoader, XYZRGBLoader } from './loaders/PointCloudLoaders.js';
+export { PLYLoader, SplatLoader, SOGLoader, XYZRGBLoader } from './loaders/PointCloudLoaders.js';
 
 // Extras
 export { OrbitControls } from './extras/controls/OrbitControls.js';

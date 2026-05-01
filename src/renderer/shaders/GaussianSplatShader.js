@@ -34,10 +34,15 @@ precision highp float;
 precision highp sampler2D;
 
 // Camera
+uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 uniform vec2 uViewport;    // (width, height)
 uniform float uCutoff;     // gaussian radius in sigma (~3.0)
+uniform float uScaleModifier;
+uniform float uOpacityScale;
+uniform float uMaxScreenRadius;
+uniform float uMinScreenRadius;
 
 // Data textures (one texel per splat)
 uniform sampler2D uDataTex0; // x, y, z, sx
@@ -90,12 +95,13 @@ void main() {
   vec4 d3 = texelFetch(uDataTex3, uv, 0); // b, a, pad, pad
 
   vec3 splatPos = d0.xyz;
-  vec3 splatScale = vec3(d0.w, d1.x, d1.y);
+  vec3 splatScale = max(vec3(d0.w, d1.x, d1.y) * uScaleModifier, vec3(0.0001));
   vec4 splatQuat = vec4(d1.z, d1.w, d2.x, d2.y); // w,x,y,z
   vec4 splatColor = vec4(d2.z, d2.w, d3.x, d3.y);
 
   // ── 1. Transform centre to view space ──
-  vec4 viewCenter = uView * vec4(splatPos, 1.0);
+  vec4 worldCenter = uModel * vec4(splatPos, 1.0);
+  vec4 viewCenter = uView * worldCenter;
 
   // Crude near-plane cull
   if (viewCenter.z > -0.1) {
@@ -113,33 +119,31 @@ void main() {
     0.0, 0.0, splatScale.z*splatScale.z
   );
   mat3 Sigma3D = R * S * transpose(R);
+  mat3 model3 = mat3(uModel);
+  mat3 SigmaWorld = model3 * Sigma3D * transpose(model3);
 
   // ── 3. Project 3D covariance to 2D screen covariance ──
-  // Jacobian of the perspective projection at the splat centre
-  float fx = uProjection[0][0]; // 2n/(r-l) ≈ focal_x / (w/2)
-  float fy = uProjection[1][1]; // 2n/(t-b)
-  float iz = -1.0 / viewCenter.z;
   // The upper-left 3×3 of the view matrix (rotation only)
   mat3 V3 = mat3(uView);
-  mat3 cov3View = V3 * Sigma3D * transpose(V3);
+  mat3 cov3View = V3 * SigmaWorld * transpose(V3);
 
-  // Jacobian of projection (see "3D Gaussian Splatting" appendix)
-  mat2 J = mat2(
-    fx * iz, 0.0,
-    0.0,     fy * iz
-  );
+  // Jacobian of perspective projection into pixel space. The previous
+  // implementation added a pixel-sized low-pass term to NDC covariance,
+  // which made normal splats expand to full-screen ellipses.
+  float focalX = uProjection[0][0] * uViewport.x * 0.5;
+  float focalY = uProjection[1][1] * uViewport.y * 0.5;
+  float invZ = 1.0 / max(-viewCenter.z, 0.0001);
+  vec3 jacobianX = vec3(focalX * invZ, 0.0, -focalX * viewCenter.x * invZ * invZ);
+  vec3 jacobianY = vec3(0.0, focalY * invZ, -focalY * viewCenter.y * invZ * invZ);
 
-  // 2D covariance in NDC → pixel
-  mat2 cov2D = J * mat2(cov3View[0].xy, cov3View[1].xy) * transpose(J);
-
-  // Add low-pass filter (prevent aliasing from sub-pixel splats)
-  cov2D[0][0] += 0.3;
-  cov2D[1][1] += 0.3;
+  float covXX = dot(jacobianX, cov3View * jacobianX) + 0.3;
+  float covXY = dot(jacobianX, cov3View * jacobianY);
+  float covYY = dot(jacobianY, cov3View * jacobianY) + 0.3;
 
   // ── 4. Eigendecomposition of symmetric 2×2 for ellipse axes ──
-  float a = cov2D[0][0];
-  float b = cov2D[0][1];
-  float d = cov2D[1][1];
+  float a = covXX;
+  float b = covXY;
+  float d = covYY;
   float det = a * d - b * b;
   if (det <= 0.0) {
     gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
@@ -149,17 +153,16 @@ void main() {
   }
   float trace = a + d;
   float disc = sqrt(max(trace * trace * 0.25 - det, 0.0));
-  float lambda1 = trace * 0.5 + disc;
-  float lambda2 = trace * 0.5 - disc;
+  float lambda1 = max(trace * 0.5 + disc, 0.0001);
+  float lambda2 = max(trace * 0.5 - disc, 0.0001);
 
-  if (lambda2 <= 0.0) lambda2 = 0.0001;
-
-  float r1 = sqrt(lambda1) * uCutoff;
-  float r2 = sqrt(lambda2) * uCutoff;
+  float radiusLimit = max(uMaxScreenRadius, 1.0);
+  float r1 = min(sqrt(lambda1) * uCutoff, radiusLimit);
+  float r2 = min(sqrt(lambda2) * uCutoff, radiusLimit);
 
   // Screen-space size cull
-  float maxR = max(r1, r2) * uViewport.x * 0.5;
-  if (maxR < 0.5) {
+  float maxR = max(r1, r2);
+  if (maxR < uMinScreenRadius) {
     gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
     vColor = vec4(0.0);
     vOffset = vec2(0.0);
@@ -182,14 +185,14 @@ void main() {
   vec4 clipCenter = uProjection * viewCenter;
   vec2 ndcCenter = clipCenter.xy / clipCenter.w;
 
-  // Offset in NDC
-  vec2 ndcOffset = offset; // cov2D is already in NDC
+  // Offset from pixels to NDC
+  vec2 ndcOffset = vec2(offset.x * 2.0 / uViewport.x, offset.y * 2.0 / uViewport.y);
   vec2 finalNDC = ndcCenter + ndcOffset;
 
   gl_Position = vec4(finalNDC * clipCenter.w, clipCenter.z, clipCenter.w);
 
   // Pass through
-  vColor = splatColor;
+  vColor = vec4(splatColor.rgb, clamp(splatColor.a * uOpacityScale, 0.0, 1.0));
   vOffset = aQuadPos * uCutoff;
 }
 `;
@@ -202,18 +205,20 @@ precision highp float;
 in vec4 vColor;
 in vec2 vOffset;
 uniform float uCutoff;
+uniform float uMinAlpha;
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
   // Gaussian weight: exp(-0.5 * d²) where d is distance in sigma units
-  float d2 = dot(vOffset, vOffset) / (uCutoff * uCutoff);
-  float gauss = exp(-0.5 * d2 * (uCutoff * uCutoff));
+  float d2 = dot(vOffset, vOffset);
+  if (d2 > uCutoff * uCutoff) discard;
+  float gauss = exp(-0.5 * d2);
 
   // Threshold
-  if (gauss < 0.004) discard;
-
   float alpha = vColor.a * gauss;
+  if (alpha < uMinAlpha) discard;
+
   // Premultiplied alpha output
   fragColor = vec4(vColor.rgb * alpha, alpha);
 }
@@ -262,7 +267,9 @@ export class GaussianSplatShader extends Shader {
 
     // Uniforms
     for (const name of [
-      'uView', 'uProjection', 'uViewport', 'uCutoff',
+      'uModel', 'uView', 'uProjection', 'uViewport', 'uCutoff',
+      'uScaleModifier', 'uOpacityScale', 'uMaxScreenRadius',
+      'uMinScreenRadius', 'uMinAlpha',
       'uDataTex0', 'uDataTex1', 'uDataTex2', 'uDataTex3',
       'uDataWidth',
       'uSortedIndices', 'uIndexWidth'

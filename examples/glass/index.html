@@ -183,12 +183,15 @@
 
     // Global renderer variable
     let renderer = null;
+    let rendererGeneration = 0;
     
     // Helper to get current canvas (it gets replaced on backend switch)
     const getCanvas = () => document.getElementById('canvas');
     
     // Initialize renderer with specified backend
     async function initRenderer(backendType) {
+      const generation = ++rendererGeneration;
+
       // Dispose old renderer if it exists
       if (renderer) {
         renderer.dispose();
@@ -207,7 +210,7 @@
       const canvas = document.getElementById('canvas');
       
       // Create renderer with specified backend
-      renderer = new BangBangRenderer({
+      const nextRenderer = new BangBangRenderer({
         canvas: canvas,
         width: window.innerWidth,
         height: window.innerHeight,
@@ -216,10 +219,16 @@
       });
       
       // Wait for initialization (GPU is async)
-      await renderer.initialize();
-      
-      renderer.setClearColor(0x1a1a2e);
-      
+      await nextRenderer.initialize();
+
+      if (generation !== rendererGeneration) {
+        nextRenderer.dispose();
+        return null;
+      }
+
+      nextRenderer.setClearColor(0x1a1a2e);
+      renderer = nextRenderer;
+
       console.log('Backend initialized:', renderer.backendType);
       
       // Update UI
@@ -373,7 +382,9 @@
       innerCube.rotation.x += 0.01;
 
       // Render scene
-      renderer.render(scene, camera);
+      if (renderer && renderer.isReady()) {
+        renderer.render(scene, camera);
+      }
     }
 
     // Handle window resize
